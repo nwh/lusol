@@ -1,6 +1,6 @@
 ## LUSOL
 
-LUSOL maintains LU factors of a square or rectangular sparse matrix A.
+LUSOL maintains LU factors of a square or rectangular sparse matrix.
 
 This repository provides LUSOL source code and a Matlab interface.
 
