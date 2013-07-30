@@ -13,8 +13,7 @@ The code is distributed under the terms of the [Common Public License][CPL].
 
 ## TODO
 
-- fix cross platform issues in `lusol_build` and `lusol_obj` relating to loading
-  the `clusol library`.
+- Include binaries in matlab directory.
 
 ## Authors
 
