@@ -44,13 +44,14 @@ else
   LDFLAGS := -shared -lgfortran
 endif
 
-# print helper
-print-%:
-	@echo $* := $($*)
+# list of files required by matlab
+MATLAB_FILES := \
+  matlab/libclusol.$(LIB_SUFFIX) \
+  matlab/clusol.h \
+  matlab/libclusol_proto_$(MLARCH).m \
+  matlab/libclusol_thunk_$(MLARCH).$(LIB_SUFFIX)
 
-.PHONY: all
-all: lib/libclusol.$(LIB_SUFFIX) include/clusol.h
-
+# list of interface specification files
 INTERFACE_FILES := \
   gen/interface.py \
   gen/interface_files.org \
@@ -65,6 +66,7 @@ INTERFACE_FILES := \
   gen/lu8rpc.org \
   gen/lu8rpr.org
 
+# list of F77 code files
 F77_FILES := \
 	src/lusol_util.f \
   src/lusol6b.f \
@@ -73,7 +75,11 @@ F77_FILES := \
 
 F77_OBJ := $(patsubst %.f,%.o,$(filter %.f,$(F77_FILES)))
 
-# pattern to compile fortran files
+# default target to build everything
+.PHONY: all
+all: lib/libclusol.$(LIB_SUFFIX) include/clusol.h $(MATLAB_FILES)
+
+# pattern to compile fortran 77 files
 $(F77_OBJ) : %.o : %.f
 	$(F77C) $(F77FLAGS) -c $< -o $@
 
@@ -107,30 +113,32 @@ lib/libclusol.$(LIB_SUFFIX): src/libclusol.$(LIB_SUFFIX)
 	mkdir -p lib
 	cp $< $@
 
-.PHONY: matlab
-matlab: src/libclusol.$(LIB_SUFFIX) src/clusol.h
+$(MATLAB_FILES): src/libclusol.$(LIB_SUFFIX) src/clusol.h
 	cp src/libclusol.$(LIB_SUFFIX) src/clusol.h ./matlab/
 	$(ML) $(MLFLAGS) -r "cd matlab; lusol_build; exit"
 
+.PHONY: matlab
+matlab: $(MATLAB_FILES)
+
 .PHONY: matlab_test
-matlab_test: matlab
+matlab_test: $(MATLAB_FILES)
 	$(ML) $(MLFLAGS) -r "cd matlab; lusol_test; exit"
 
 .PHONY: clean
 clean:
 	$(RM) src/*.o
-	$(RM) src/*.so
-	$(RM) src/*.dylib
+	$(RM) src/*.$(LIB_SUFFIX)
 	$(RM) src/*.mod
 	$(RM) lib/libclusol.so
 	$(RM) lib/libclusol.$(LIB_SUFFIX)
 	$(RM) include/clusol.h
-	$(RM) matlab/libclusol.$(LIB_SUFFIX)
-	$(RM) matlab/clusol.h
-	$(RM) matlab/libclusol_proto.m
-	$(RM) matlab/libclusol_thunk_$(MLARCH).$(LIB_SUFFIX)
+	$(RM) $(MATLAB_FILES)
 
 .PHONY: clean_gen
 clean_gen:
 	$(RM) src/clusol.h
 	$(RM) src/clusol.c
+
+# print helper
+#print-%:
+#	@echo $* := $($*)

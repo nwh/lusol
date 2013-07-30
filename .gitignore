@@ -6,4 +6,4 @@
 matlab/clusol.h
 include/clusol.h
 *.dylib
-matlab/libclusol_proto.m
+matlab/libclusol_proto*.m

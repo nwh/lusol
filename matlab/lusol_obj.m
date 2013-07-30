@@ -213,8 +213,31 @@ classdef lusol_obj < handle
       v = lusol_obj.get_range(p,i,i);
     end
 
-    function unload
-      %UNLOAD  Unload the cLUSOL shared library
+    function load_library
+      %LOAD_LIBRARY  Load the clusol shared library
+      
+      % do nothing if the library is already loaded
+      if libisloaded('libclusol')
+        return;
+      end
+      
+      switch lower(computer)
+        case 'glnxa64'
+          % load clusol with linux prototype file
+          loadlibrary('libclusol',@libclusol_proto_glnxa64);
+        case 'maci64'
+          % load clusol with mac prototype file
+          loadlibrary('libclusol',@libclusol_proto_maci64);
+        otherwise
+          % the interface has not been implemented for other systems
+          error('lusol_obj:load_library', ...
+            'clusol library not implemented for this architecture')
+      end
+      
+    end
+    
+    function unload_library
+      %UNLOAD_LIBRARY  Unload the clusol shared library
 
       if libisloaded('libclusol')
         unloadlibrary('libclusol');
@@ -620,10 +643,8 @@ classdef lusol_obj < handle
       %
 
       % load the shared library
-      if ~libisloaded('libclusol')
-        [notfound warnings] = loadlibrary('libclusol',@libclusol_proto);
-      end
-
+      obj.load_library;
+      
       % factorize the matrix
       obj.factorize(A,varargin{:});
 

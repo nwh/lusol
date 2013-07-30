@@ -36,6 +36,9 @@ function lusol_build
   % load the library to generate proto and thunk files
   loadlibrary('libclusol','clusol.h','notempdir','compilerconfiguration',cc);
   
+  % rename the thunk file
+  movefile('libclusol_proto.m',['libclusol_proto_' lower(computer) '.m'])
+  
   % clean up the code files
   tcfilename = ['libclusol_thunk_' lower(computer) '.c'];
   delete('clusol.i',tcfilename);
