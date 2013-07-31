@@ -13,7 +13,7 @@ The code is distributed under the terms of the [Common Public License][CPL].
 
 ## Matlab install
 
-Add `lusol/matlab` to your Matlab path.  This may be done with Matlab's `[addpath][ADDPATH]` function.
+Add `lusol/matlab` to your Matlab path.  This may be done with Matlab's [`addpath`][ADDPATH] function.
 
 If the interface has not been built, please follow the directions below.
 
