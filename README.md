@@ -11,6 +11,14 @@ The code is distributed under the terms of the [Common Public License][CPL].
   [LUSOL]: http://www.stanford.edu/group/SOL/software/lusol.html
   [CPL]: http://www.ibm.com/developerworks/library/os-cpl.html
 
+## Matlab install
+
+Add `lusol/matlab` to your Matlab path.  This may be done with Matlab's `[addpath][ADDPATH]` function.
+
+If the interface has not been built, please follow the directions below.
+
+  [ADDPATH]: http://www.mathworks.com/help/matlab/ref/addpath.html
+
 ## Build
 
 From the `lusol` directory:
