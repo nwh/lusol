@@ -1,4 +1,28 @@
 classdef lusol_test < handle
+  %LUSOL_TEST  test suite for lusol interface
+  %
+  % Calling lusol_test from the Matlab command line causes an lusol_test object
+  % to be constructed.  The constructer calls all relevant test methods.
+  %
+  % Usage:
+  %  >> lusol_test;
+  %
+  % Example output:
+  %  >> lusol_test;
+  %  test_addcol_lhr02: passed
+  %  test_addrow_lhr02: passed
+  %  test_delcol_lhr02: passed
+  %  test_delrow_lhr02: passed
+  %  test_factorize_lhr02: passed
+  %  test_mulA_lhr02: passed
+  %  test_mulAt_lhr02: passed
+  %  test_r1mod_lhr02: passed
+  %  test_repcol_lhr02: passed
+  %  test_reprow_lhr02: passed
+  %  test_solveA_lhr02: passed
+  %  test_solveAt_lhr02: passed
+  %  ... (more test methods may have been added)
+  %
 
   properties
 

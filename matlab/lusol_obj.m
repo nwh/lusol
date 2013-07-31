@@ -6,23 +6,32 @@ classdef lusol_obj < handle
   %  options = lusol_obj.luset('pivot','TRP')
   %
   % Initialization:
-  %  lu = lusol_obj(A)
+  %  mylu = lusol_obj(A)
   %
   % Initialization specifying options:
-  %  lu = lusol_obj(A,options)
+  %  mylu = lusol_obj(A,options)
+  %
+  % Note that initialization performs the factorization.  Subsequent
+  % factorizations with the same object may be performed with the factorize
+  % method.
   %
   % Factorize:
-  %  [inform nsing depcol] = lu.factorize(A)
-  %  [inform nsing depcol] = lu.factorize(A,options)
+  %  [inform nsing depcol] = mylu.factorize(A)
+  %  [inform nsing depcol] = mylu.factorize(A,options)
+  %
+  % There are several operations that may be performed with a lusol object.
   %
   % Usage:
-  %  y = lu.mulA(x);
-  %  x = lu.solveA(b);
+  %  y = mylu.mulA(x);   % y = A*x
+  %  y = mylu.mulAt(x);  % y = A'*x
+  %  x = mylu.solveA(b); % x = A\b
+  %  x = mylu.solveAt(b); % x = A'\b
   %
   % Update:
-  %  inform = lu.repcol(v,j);
+  %  inform = mylu.repcol(v,j); % replace column j of A with vector v
   %
   % See also:
+  %  lusol
   %  lusol_obj.luset
   %  lusol_obj.factorize
   %  lusol_obj.stats
@@ -51,6 +60,7 @@ classdef lusol_obj < handle
   %  lusol_obj.delcol
   %  lusol_obj.delrow
   %  lusol_obj.r1mod
+  %
 
   properties (Access=private)
 
@@ -118,10 +128,10 @@ classdef lusol_obj < handle
   methods (Static)
 
     function options = luset(varargin)
-      %luset  process input to create lusol options structure
+      %LUSET  process input to create lusol options structure
       %
       % This method uses Matlab's inputParser class to handle lusol options.
-      % It handles no input, input structures, and key-value lists just like
+      % It handles empty input, input structures, and key-value lists just like
       % many other Matlab programs.
       %
       % To obtain a structure with default settings use:
@@ -136,16 +146,13 @@ classdef lusol_obj < handle
       % The best reference for the lusol parameters is currently the comments
       % for the lu1fac subroutine in lusol1.f.
       %
-      %
       % |--------+----------+----------------------------------------------------|
       % | param  |  default | description                                        |
       % |--------+----------+----------------------------------------------------|
       %
-      % lusol_mex options
+      % lusol_obj options
       % |--------+----------+----------------------------------------------------|
       % | nzinit |        0 | minimum length for storage arrays                  |
-      % | minit  |        0 | minimum length for 'row-space' arrays              |
-      % | ninit  |        0 | minimum length for 'column-space' arrays           |
       % |--------+----------+----------------------------------------------------|
       %
       % LUSOL integer parameters
@@ -193,10 +200,11 @@ classdef lusol_obj < handle
 
       % obtain the output
       options = in_parse.Results;
+
     end
 
     function r = get_range(p,i,j)
-      %get_range  return a subset array from a libpointer array
+      %GET_RANGE  return a subset array from a libpointer array
 
       % get the datatype of the libpointer object
       pdatatype = p.DataType;
@@ -206,21 +214,24 @@ classdef lusol_obj < handle
       pp.setdatatype(pdatatype,j-i+1);
       % get the return array
       r = pp.Value;
+
     end
 
     function v = get_value(p,i)
-      %get_value  return a single value from a libpointer array
+      %GET_VALUE  return a single value from a libpointer array
+
       v = lusol_obj.get_range(p,i,i);
+
     end
 
     function load_library
       %LOAD_LIBRARY  Load the clusol shared library
-      
+
       % do nothing if the library is already loaded
       if libisloaded('libclusol')
         return;
       end
-      
+
       switch lower(computer)
         case 'glnxa64'
           % load clusol with linux prototype file
@@ -233,9 +244,9 @@ classdef lusol_obj < handle
           error('lusol_obj:load_library', ...
             'clusol library not implemented for this architecture')
       end
-      
+
     end
-    
+
     function unload_library
       %UNLOAD_LIBRARY  Unload the clusol shared library
 
@@ -250,7 +261,7 @@ classdef lusol_obj < handle
   methods (Access=private)
 
     function parse_options(obj,varargin)
-      %parse_options  process the options structure to set parameters.
+      %PARSE_OPTIONS  process the options structure to set parameters.
 
       % use luset to parse user input
       options = obj.luset(varargin{:});
@@ -288,11 +299,12 @@ classdef lusol_obj < handle
     end
 
     function set_options(obj)
-      %set_options allocate and assign parameters to LUSOL arrays
+      %SET_OPTIONS  allocate and assign parameters to LUSOL arrays
       %
       % LUSOL stores input and output scalar parameters in two vectors:
-      %   luparm is an integer array of length 30
-      %   parmlu is a double array of length 30
+      %
+      %  luparm is an integer array of length 30
+      %  parmlu is a double array of length 30
       %
       % this method sets the LUSOL input parameters in the correct location
       % for the fortran calls.
@@ -318,10 +330,11 @@ classdef lusol_obj < handle
       % allocate and initialize pointers
       obj.luparm_ptr = libpointer(obj.int_ptr_class,luparm);
       obj.parmlu_ptr = libpointer('doublePtr',parmlu);
+
     end
 
     function allocate_and_copy(obj,A)
-      %allocate  allocate LUSOL storage arrays
+      %ALLOCATE_AND_COPY  allocate LUSOL storage arrays
       %
       % LUSOL operates on many arrays.  This method allocates all of them
       % to an appropriate size.
@@ -381,28 +394,32 @@ classdef lusol_obj < handle
     end
 
     function update_check(obj)
-      %update_check  throw an error if this method is called after updates
+      %UPDATE_CHECK  throw an error if this method is called after updates
       %
       % Some methods should not be called after updates to a factorization.
       % This method checks if any updated have occuered and throws and
       % error if this is the case.
       %
-      %nupdat = obj.luparm_ptr.Value(15);
+
       nupdat = lusol_obj.get_value(obj.luparm_ptr,15);
       if nupdat > 0
         error('lusol:post_update_call_error', ...
               'nsing and depcol cannot be called after updates.')
       end
+
     end
 
     function [x inform resid] = clu6sol(obj,b,mode)
-      %solve  call lu6sol to perform various solves with L and U factors.
+      %CLU6SOL  call lu6sol to perform various solves with L and U factors.
       %
-      % Performs data processing and direct call to mex function for
+      % Performs data processing and direct call to clusol function for
       % solves.  Right hand side must be a vector.
       %
+      % This is a private method and should only be used by class methods.
+      % Users should call the various public interface methods.
+      %
       % Usage:
-      %  x = lu.solve_mex(b,mode)
+      %  x = obj.clu6sol(b,mode)
       %
       % Input:
       %  b = right hand side vector
@@ -514,11 +531,14 @@ classdef lusol_obj < handle
     function y = clu6mul(obj,x,mode)
       %CLU6MUL  call LUSOL to perform various multiplies with L and U factors.
       %
-      % Performs data processing and direct call to mex function to compute
+      % Performs data processing and direct call to clusol function to compute
       % a matrix vector multiply with the desired factor.
       %
+      % This is a private method and should only be used by class methods.
+      % Users should call the various public interface methods.
+      %
       % Usage:
-      %  y = lu.mul_mex(x,mode)
+      %  y = obj.clu6mul(x,mode)
       %
       % Input:
       %  x = vector to multiply
@@ -534,9 +554,6 @@ classdef lusol_obj < handle
       %  4    y = U'x
       %  5    y = A x (default)
       %  6    y = A'x
-      %
-      % Warning: mulLt (mode=2) and mulAt (mode=6) do not work.
-      %          currently, the code will throw an error if this is attempted.
       %
 
       % handle optional input
@@ -632,32 +649,32 @@ classdef lusol_obj < handle
     % constructor and main factorize method
 
     function obj = lusol_obj(A,varargin)
-      %lusol  constructor for lusol object, factorize A
+      %LUSOL_OBJ  constructor for lusol object, factorize A
       %
       % Creates lusol object and factorizes A.
       %
       % Example:
       %   mylu = lusol(A);
       %
-      % See lusol.factorize for more info.
+      % See also: LUSOL_OBJ.FACTORIZE
       %
 
       % load the shared library
       obj.load_library;
-      
+
       % factorize the matrix
       obj.factorize(A,varargin{:});
 
     end
 
     function [inform nsing depcol] = factorize(obj,A,varargin)
-      %FACTORIZE  perform lu factorization on A.
+      %FACTORIZE  perform lu factorization on A
       %
       % This method tells LUSOL to perform an LU factorization on A.
       %
-      % Usage (after lu object is initialized):
-      %  [inform nsing depcol] = lu.factorize(A)
-      %  [inform nsing depcol] = lu.factorize(A,options)
+      % Usage (after mylu object is initialized):
+      %  [inform nsing depcol] = mylu.factorize(A)
+      %  [inform nsing depcol] = mylu.factorize(A,options)
       %
       % Input:
       %  A = matrix to factorize
@@ -837,6 +854,7 @@ classdef lusol_obj < handle
       %          during TCP factorization.
       % growth   TPP: Umax/Amax    TRP, TCP, TSP: Akmax/Amax.
       % resid    lu6sol: residual after solve with U or U'.
+      %
 
       luparm = double(obj.luparm_ptr.Value);
       parmlu = double(obj.parmlu_ptr.Value);
@@ -1117,7 +1135,7 @@ classdef lusol_obj < handle
     % solve methods
 
     function [X inform resid] = solve(obj,B,mode)
-      %solve  solve systems with matrix factors
+      %SOLVE  solve systems with matrix factors
       %
       % This function solves all of the relavent systems of equations.  If
       % right hand side B is a matrix, it will solve for matrix X.
@@ -1132,12 +1150,12 @@ classdef lusol_obj < handle
       %  resid = 1-norm of residuals for each solve
       %
       % Modes:
-      %  1    X  solves   L X = B
-      %  2    X  solves   L'X = B
-      %  3    X  solves   U X = B
-      %  4    X  solves   U'X = B
-      %  5    X  solves   A X = B (default)
-      %  6    X  solves   A'X = B
+      %  1    X  solves   L * X = B
+      %  2    X  solves   L'* X = B
+      %  3    X  solves   U * X = B
+      %  4    X  solves   U'* X = B
+      %  5    X  solves   A * X = B (default)
+      %  6    X  solves   A'* X = B
       %
       % inform flags:
       %  0 = successful solve
@@ -1205,57 +1223,57 @@ classdef lusol_obj < handle
     end
 
     function [X inform resid] = solveA(obj,B)
-      %solveA  solve A X = B.
+      %SOLVEA  solve A*X = B.
       %
-      % see also lusol.solve
+      % See also: lusol.solve
       [X inform resid] = obj.solve(B,5);
     end
 
     function [X inform resid] = solveAt(obj,B)
-      %solveAt  solve A'X = B.
+      %SOLVEAT  solve A'*X = B.
       %
-      % see also lusol.solve
+      % See also: lusol.solve
       [X inform resid] = obj.solve(B,6);
     end
 
     function [X inform] = solveL(obj,B)
-      %solveL  solve L X = B.
+      %SOLVEL  solve L*X = B.
       %
-      % see also lusol.solve
+      % See also: lusol.solve
       [X inform] = obj.solve(B,1);
     end
 
     function [X inform] = solveLt(obj,B)
-      %solveLt  solve L'X = B.
+      %SOLVELT  solve L'*X = B.
       %
-      % see also lusol.solve
+      % See also: lusol.solve
       [X inform] = obj.solve(B,2);
     end
 
     function [X inform resid] = solveU(obj,B)
-      %solveU  solve U X = B.
+      %SOLVEU  solve U*X = B.
       %
-      % see also lusol.solve
+      % See also: lusol.solve
       [X inform resid] = obj.solve(B,3);
     end
 
     function [X inform resid] = solveUt(obj,B)
-      %solveUt  solve U'X = B.
+      %SOLVEUT  solve U'*X = B.
       %
-      % see also lusol.solve
+      % See also: lusol.solve
       [X inform resid] = obj.solve(B,4);
     end
 
     % multiply methods
 
     function Y = mul(obj,X,mode)
-      %mul  compute matrix multiplies with various factors
+      %MUL  compute matrix multiplies with various factors
       %
       % Perform matrix-vector or matrix-matrix multiply with desired matrix
       % factors.
       %
       % Usage:
-      %  Y = lu.mul(X,mode)
+      %  Y = mylu.mul(X,mode)
       %
       % Input:
       %  X = matrix or vector to compute multiply
@@ -1265,12 +1283,12 @@ classdef lusol_obj < handle
       %  Y = product of desired factor and X
       %
       % Mode:
-      %  1    Y = L X
-      %  2    Y = L'X
-      %  3    Y = U X
-      %  4    Y = U'X
-      %  5    Y = A X (default)
-      %  6    Y = A'X
+      %  1    Y = L * X
+      %  2    Y = L'* X
+      %  3    Y = U * X
+      %  4    Y = U'* X
+      %  5    Y = A * X (default)
+      %  6    Y = A'* X
       %
 
       % set default mode
@@ -1332,56 +1350,56 @@ classdef lusol_obj < handle
     end
 
     function Y = mulA(obj,X)
-      %mulA  compute Y = A X.
+      %MULA  compute Y = A*X.
       %
-      % see also lusol.mul
+      % See also: lusol.mul
       Y = obj.mul(X,5);
     end
 
     function Y = mulAt(obj,X)
-      %mulAt  compute Y = A'X.
+      %MULAT  compute Y = A'*X.
       %
       % Warning: this does not seem to work at the moment.
       %
-      % see also lusol.mul
+      % See also: lusol.mul
       Y = obj.mul(X,6);
     end
 
     function Y = mulL(obj,X)
-      %mulL  compute Y = L X.
+      %MULL  compute Y = L*X.
       %
-      % see also lusol.mul
+      % See also: lusol.mul
       Y = obj.mul(X,1);
     end
 
     function Y = mulLt(obj,X)
-      %mulLt  compute Y = L'X.
+      %MULLT  compute Y = L'*X.
       %
-      % see also lusol.mul
+      % See also: lusol.mul
       Y = obj.mul(X,2);
     end
 
     function Y = mulU(obj,X)
-      %mulU  compute Y = U X.
+      %MULU  compute Y = U*X.
       %
-      % see also lusol.mul
+      % See also: lusol.mul
       Y = obj.mul(X,3);
     end
 
     function Y = mulUt(obj,X)
-      %mulUt  compute Y = U'X.
+      %MULUT  compute Y = U'*X.
       %
-      % see also lusol.mul
+      % See also: lusol.mul
       Y = obj.mul(X,4);
     end
 
     % update methods
 
     function [inform diag vnorm] = repcol(obj,v,j)
-      %repcol  update LU factorization to replace a column
+      %REPCOL  update LU factorization to replace a column
       %
       % Usage:
-      %  [inform diag vnorm] = lu.repcol(v,j)
+      %  [inform diag vnorm] = mylu.repcol(v,j)
       %
       % Inputs:
       %  v = new column
@@ -1464,7 +1482,7 @@ classdef lusol_obj < handle
       %REPROW  update LU factorization to replace a row
       %
       % Usage:
-      %  inform = lu.reprow(w,i)
+      %  inform = mylu.reprow(w,i)
       %
       % Inputs:
       %  w = new row
@@ -1533,7 +1551,7 @@ classdef lusol_obj < handle
       %ADDCOL  update LU factorization to add column to end of A
       %
       % Usage:
-      %  [inform diag vnorm] = lu.addcol(v)
+      %  [inform diag vnorm] = mylu.addcol(v)
       %
       % Input:
       %  v = vector of length m to added to the end of A
@@ -1637,7 +1655,7 @@ classdef lusol_obj < handle
       %ADDROW  update LU factorization to add row to end of A
       %
       % Usage:
-      %  [inform diag] = lu.addrow(w)
+      %  [inform diag] = mylu.addrow(w)
       %
       % Input:
       %  w = vector of length n to added to the bottom of A
@@ -1725,7 +1743,7 @@ classdef lusol_obj < handle
       %DELCOL  update LU factorization to delete column j from A
       %
       % Usage:
-      %  inform = lu.delcol(j)
+      %  inform = mylu.delcol(j)
       %
       % Input:
       %  j = column to delete from A
@@ -1808,7 +1826,7 @@ classdef lusol_obj < handle
       % housekeeping is required than with  lu8dlr.
       %
       % Usage:
-      %  inform = lu.delrow(i)
+      %  inform = mylu.delrow(i)
       %
       % Input:
       %  i = row to delete from A
@@ -1880,7 +1898,7 @@ classdef lusol_obj < handle
       %R1MOD  update LU factorization to perform rank-1 update A+beta*v*w'
       %
       % Usage:
-      %  inform = lu.r1mod(v,w,beta)
+      %  inform = mylu.r1mod(v,w,beta)
       %
       % Input:
       %  v = vector of length m
