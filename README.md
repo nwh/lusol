@@ -11,6 +11,15 @@ The code is distributed under the terms of the [Common Public License][CPL].
   [LUSOL]: http://www.stanford.edu/group/SOL/software/lusol.html
   [CPL]: http://www.ibm.com/developerworks/library/os-cpl.html
 
+## Contents
+
+* `gen/`: code generation scripts and specification files
+* `matlab/`: Matlab interface code
+* `src/`: LUSOL fortran code
+* `LICENSE`: [Common Public License][CPL]
+* `README.md`: this file
+* `makefile`: GNU Make file to build interface
+
 ## Matlab install
 
 Add `lusol/matlab` to your Matlab path.  This may be done with Matlab's [`addpath`][ADDPATH] function.
@@ -95,8 +104,8 @@ test_solveAt_lhr02: passed
 
 ## Authors
 
-- **LUSOL Fortran code**: [Michael Saunders][MS]
-- **Matlab interface**: [Nick Henderson][NWH]
+* **LUSOL Fortran code**: [Michael Saunders][MS]
+* **Matlab interface**: [Nick Henderson][NWH]
 
   [MS]: http://www.stanford.edu/~saunders/
   [NWH]: http://www.stanford.edu/~nwh/
