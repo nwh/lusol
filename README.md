@@ -17,7 +17,6 @@ The code is distributed under the terms of the [Common Public License][CPL].
 * `matlab/`: Matlab interface code
 * `src/`: LUSOL fortran code
 * `LICENSE`: [Common Public License][CPL]
-* `README.md`: this file
 * `makefile`: GNU Make file to build interface
 
 ## Matlab install
