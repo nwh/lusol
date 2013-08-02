@@ -19,17 +19,54 @@ The code is distributed under the terms of the [Common Public License][CPL].
 * `LICENSE`: [Common Public License][CPL]
 * `makefile`: GNU Make file to build interface
 
-## Matlab install
+## Download and install
 
-Add `lusol/matlab` to your Matlab path.  This may be done with Matlab's [`addpath`][ADDPATH] function.
+Pre-built downloads are available on the Github [release][RELEASE] page.
+
+Installation simply requires adding the `matlab` subdirectory to your Matlab path.  This may be done with Matlab's [`addpath`][ADDPATH] function.
 
 If the interface has not been built, please follow the directions below.
 
+  [RELEASE]: https://github.com/nwh/lusol/releases
   [ADDPATH]: http://www.mathworks.com/help/matlab/ref/addpath.html
 
 ## Build
 
-From the `lusol` directory:
+### Requirements
+
+Linux:
+
+* `make`
+* `gcc`
+* `gfortran`
+* Matlab
+
+Mac:
+
+* [Command Line Tools for Xcode][CLT] or [Xcode][XC] for `gcc` and `make`
+* `gfortran` (possibly via [Homebrew][HB])
+* Matlab
+
+  [HB]: http://brew.sh/
+  [CLT]: https://developer.apple.com/downloads
+  [XC]: http://itunes.apple.com/us/app/xcode/id497799835
+
+### Notes
+
+The basic requirements to build LUSOL are GNU `make`, `gfortran`, `gcc`, and
+Matlab. The `makefile` has been tested with Matlab R2011b on both
+[CentOS 6][CENTOS] and Mac OS X 10.8.
+
+The `makefile` may have to be modified on Mac OS X depending on versions of
+Matlab and `gfortran`.  The [`LDFLAGS`][LDFLAGS] need to point to the proper
+directories for Matlab and `gfortran` shared libraries.
+
+  [LDFLAGS]: https://github.com/nwh/lusol/blob/master/makefile#L38
+  [CENTOS]: http://www.centos.org/
+
+### Steps
+
+From the base directory:
 
 ```
 $ make
@@ -64,9 +101,9 @@ To get started, type one of these: helpwin, helpdesk, or demo.
 For product information, visit www.mathworks.com.
 ```
 
-## Test
+### Test
 
-From the lusol directory:
+From the base directory:
 
 ```
 $ make matlab_test
