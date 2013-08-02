@@ -57,6 +57,9 @@ The basic requirements to build LUSOL are GNU `make`, `gfortran`, `gcc`, and
 Matlab. The `makefile` has been tested with Matlab R2011b on both
 [CentOS 6][CENTOS] and Mac OS X 10.8.
 
+The `matlab` executable must be on the system path.  On Mac OS X this is
+achieved by adding `/Applications/MATLAB_R2011b.app/bin` to `$PATH`.
+
 The `makefile` may have to be modified on Mac OS X depending on versions of
 Matlab and `gfortran`.  The [`LDFLAGS`][LDFLAGS] need to point to the proper
 directories for Matlab and `gfortran` shared libraries.
