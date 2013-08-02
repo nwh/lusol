@@ -42,7 +42,7 @@ mylu = lusol_obj(A);
 x = mylu.solveA(b);
 
 % update factorization to replace a column
-mylu.repcol(1,v);
+mylu.repcol(v,1);
 
 % solve again with updated factorization
 x1 = mylu.solveA(b);
