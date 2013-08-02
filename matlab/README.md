@@ -38,8 +38,8 @@ In Matlab:
 % create lusol object
 mylu = lusol_obj(A);
 
-% solve with lusol object
-x = mylu.solveA(b);
+% solve with lusol object (ie x = A\b)
+x = mylu.solveA(b); % x = A\b
 
 % update factorization to replace a column
 mylu.repcol(v,1);
