@@ -23,7 +23,8 @@ The code is distributed under the terms of the [Common Public License][CPL].
 
 Pre-built downloads are available on the Github [release][RELEASE] page.
 
-Installation simply requires adding the `matlab` subdirectory to your Matlab path.  This may be done with Matlab's [`addpath`][ADDPATH] function.
+Installation simply requires adding the `matlab` subdirectory to your Matlab
+path.  This may be done with Matlab's [`addpath`][ADDPATH] function.
 
 If the interface has not been built, please follow the directions below.
 
@@ -57,8 +58,12 @@ The basic requirements to build LUSOL are GNU `make`, `gfortran`, `gcc`, and
 Matlab. The `makefile` has been tested with Matlab R2011b on both
 [CentOS 6][CENTOS] and Mac OS X 10.8.
 
-The `matlab` executable must be on the system path.  On Mac OS X this is
-achieved by adding `/Applications/MATLAB_R2011b.app/bin` to `$PATH`.
+The `matlab` executable must be on the system path.  On Mac OS X with Matlab
+R2011b this is achieved with:
+
+```
+$ export PATH=/Applications/MATLAB_R2011b.app/bin:$PATH
+```
 
 The `makefile` may have to be modified on Mac OS X depending on versions of
 Matlab and `gfortran`.  The [`LDFLAGS`][LDFLAGS] need to point to the proper
