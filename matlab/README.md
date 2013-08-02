@@ -39,7 +39,7 @@ In Matlab:
 mylu = lusol_obj(A);
 
 % solve with lusol object (ie x = A\b)
-x = mylu.solveA(b); % x = A\b
+x = mylu.solveA(b);
 
 % update factorization to replace a column
 mylu.repcol(v,1);
