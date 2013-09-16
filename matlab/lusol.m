@@ -13,10 +13,10 @@ function [L U P Q] = lusol(A,pm_opt,varargin)
   %  lusol_options = lusol();
   %
   % Advanced usage:
-  %  [L U p q] = lusol(A,'vector')
-  %  [L U p q] = lusol(A,'vector',lusol_options)
-  %  [L U p q] = lusol(A,'vector','pivot','TPP')
-  %  [L U] = lusol(A)
+  %  [L U p q] = lusol(A,'vector');
+  %  [L U p q] = lusol(A,'vector',lusol_options);
+  %  [L U p q] = lusol(A,'vector','pivot','TPP');
+  %  [L U] = lusol(A);
   %
   % The second argument to lusol is a string specifying the desired form of the
   % permutation information.  Setting this to 'matrix' or [] tells lusol to
