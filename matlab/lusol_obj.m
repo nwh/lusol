@@ -2,22 +2,22 @@ classdef lusol_obj < handle
   %LUSOL_OBJ  access to LUSOL for computations on a sparse LU factorization.
   %
   % Optional parameters:
-  %  options = lusol_obj.luset()
-  %  options = lusol_obj.luset('pivot','TRP')
+  %  options = lusol_obj.luset();
+  %  options = lusol_obj.luset('pivot','TRP');
   %
   % Initialization:
-  %  mylu = lusol_obj(A)
+  %  mylu = lusol_obj(A);
   %
   % Initialization specifying options:
-  %  mylu = lusol_obj(A,options)
+  %  mylu = lusol_obj(A,options);
   %
   % Note that initialization performs the factorization.  Subsequent
   % factorizations with the same object may be performed with the factorize
   % method.
   %
   % Factorize:
-  %  [inform nsing depcol] = mylu.factorize(A)
-  %  [inform nsing depcol] = mylu.factorize(A,options)
+  %  [inform nsing depcol] = mylu.factorize(A);
+  %  [inform nsing depcol] = mylu.factorize(A,options);
   %
   % There are several operations that may be performed with a lusol object.
   %
