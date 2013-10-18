@@ -52,7 +52,7 @@ Mac:
   [CLT]: https://developer.apple.com/downloads
   [XC]: http://itunes.apple.com/us/app/xcode/id497799835
 
-Note: =python3= is required to generate the interface code.  However, the
+Note: `python3` is required to generate the interface code.  However, the
 interface code is pre-generated and included in the repository.
 
 ### Notes
