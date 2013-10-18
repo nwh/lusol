@@ -52,11 +52,18 @@ Mac:
   [CLT]: https://developer.apple.com/downloads
   [XC]: http://itunes.apple.com/us/app/xcode/id497799835
 
+Note: =python3= is required to generate the interface code.  However, the
+interface code is pre-generated and included in the repository.
+
 ### Notes
 
 The basic requirements to build LUSOL are GNU `make`, `gfortran`, `gcc`, and
-Matlab. The `makefile` has been tested with Matlab R2011b on both
-[CentOS 6][CENTOS] and Mac OS X 10.8.
+Matlab. The `makefile` has been tested with Matlab R2011b on [CentOS 6][CENTOS],
+[Ubuntu 12.10][UBUNTU], and Mac OS X 10.8.
+
+It may be necessary to modify the compiler variables in the `makefile` (`CC`,
+`F90C`, and `F77C`) depending on the operating system and environment.  For
+example, [Ubuntu 12.10][UBUNTU] requires GCC version 4.4.
 
 The `matlab` executable must be on the system path.  On Mac OS X with Matlab
 R2011b this is achieved with:
@@ -71,6 +78,7 @@ directories for Matlab and `gfortran` shared libraries.
 
   [LDFLAGS]: https://github.com/nwh/lusol/blob/master/makefile#L38
   [CENTOS]: http://www.centos.org/
+  [UBUNTU]: http://releases.ubuntu.com/12.10/
 
 ### Steps
 
