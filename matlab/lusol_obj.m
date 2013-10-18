@@ -256,6 +256,33 @@ classdef lusol_obj < handle
 
     end
 
+    function y = vector_process(x,xn)
+      %VECTOR_PROCESS check and prepare vector for use in update routines
+      %
+      % Usage:
+      %  y = lusol_obj.vector_process(x,xn);
+      %
+      % Input:
+      %  x = input vector
+      %  xn = expected length of x
+      %
+      % Output:
+      %  y = output vector (double, full, and columnar)
+      %
+      % Error:
+      %  The function will throw an error if x is not a vector of length xn
+      %
+
+      % check input vector
+      if ~isvector(x) || length(x) ~= xn
+        error('lusol_obj:vector_process','input is not a vector of correct length.');
+      end
+
+      % orient and densify
+      y = double(full(x(:)));
+
+    end
+
   end
 
   methods (Access=private)
@@ -567,7 +594,7 @@ classdef lusol_obj < handle
       end
 
       % orient x vector
-      x = x(:);
+      x = double(full(x(:)));
       lenx = length(x);
 
       % get matrix size
@@ -1423,18 +1450,15 @@ classdef lusol_obj < handle
       % get matrix size
       [m n] = obj.size();
 
-      % check input vector
-      if ~isvector(v) || length(v) ~= m
-        error('lusol:repcol','v must be a vector of length m.');
-      end
+      % check and process input vector
+      v = lusol_obj.vector_process(v,m);
 
       % check index of column to replace
       if j < 1 || j > n
         error('lusol:repcol','j must be between 1 and n.');
       end
 
-      % orient and densify
-      v = v(:);
+      % create pointer to data
       v_ptr = libpointer('doublePtr',v);
 
       % temporary storage
@@ -1502,12 +1526,8 @@ classdef lusol_obj < handle
       % get matrix size
       [m n] = obj.size();
 
-      if ~isvector(w) || length(w) ~= n
-        error('lusol:reprow','w must be a vector of length n.')
-      end
-
-      % orient
-      w = w(:);
+      % check and process input vector
+      w = lusol_obj.vector_process(w,n);
 
       % prepare libpointers
       mode1_ptr = libpointer(obj.int_ptr_class,1);
@@ -1573,13 +1593,8 @@ classdef lusol_obj < handle
       [m nold] = obj.size();
       n = nold + 1;
 
-      % check input
-      if ~isvector(v) || length(v) ~= m
-        error('lusol:addcol','v must be a vector of length m.')
-      end
-
-      % orient v
-      v = v(:);
+      % check and process input vector
+      v = lusol_obj.vector_process(v,m);
 
       % copy and increase size of "row" arrays
       % these arrays have length nold and must be increased to length n
@@ -1676,13 +1691,8 @@ classdef lusol_obj < handle
       [mold n] = obj.size();
       m = mold + 1;
 
-      % check input
-      if ~isvector(w) || length(w) ~= n
-        error('lusol:addrow','w must be a vector of length n.')
-      end
-
-      % orient
-      w = w(:);
+      % check and process input vector
+      w = lusol_obj.vector_process(w,n);
 
       % allocate vectors of length m
       p = zeros(m,1,obj.int_class);
@@ -1923,20 +1933,9 @@ classdef lusol_obj < handle
         beta = 1.0;
       end
 
-      % check input
-      if ~isvector(v) || length(v) ~= m
-        error('lusol:r1mod','v must be a vector of length m.')
-      end
-      if ~isvector(w) || length(w) ~= n
-        error('lusol:r1mod','w must be a vector of length n.')
-      end
-      if ~isscalar(beta)
-        error('lusol:r1mod','beta must be a scalar.')
-      end
-
-      % orient vectors
-      v = v(:);
-      w = w(:);
+      % check and process input vectors
+      v = lusol_obj.vector_process(v,m);
+      w = lusol_obj.vector_process(w,n);
 
       % prepare temporary libpointers
       mode_ptr = libpointer(obj.int_ptr_class,1);
