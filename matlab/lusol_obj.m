@@ -342,6 +342,7 @@ classdef lusol_obj < handle
       parmlu = zeros(30,1,'double');
 
       % set parameter values
+      luparm(2) = cast(-1,obj.int_class);
       luparm(3) = cast(obj.maxcol,obj.int_class);
       luparm(6) = cast(obj.pivot,obj.int_class);
       luparm(8) = cast(obj.keepLU,obj.int_class);
@@ -1071,8 +1072,8 @@ classdef lusol_obj < handle
       % handle optional generation of permutation matrices
       if matrflg
         % construct and return sparse permutation matrices
-        p = sparse(1:n,p,1,n,n);
-        q = sparse(q,1:m,1,m,m);
+        p = sparse((1:n)',p,1,n,n);
+        q = sparse(q,(1:m)',1,m,m);
       end
     end
 
@@ -1155,7 +1156,7 @@ classdef lusol_obj < handle
       % handle optional conversion of permuation vector to matrix
       if matrflg
         % construct and return sparse permutation matrix
-        p = sparse(1:n,p,1);
+        p = sparse((1:n)',p,1);
       end
     end
 
