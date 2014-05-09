@@ -35,8 +35,8 @@ ifneq ($(DARWIN),)
   # settings for mac os x
   LIB_SUFFIX := dylib
   LDFLAGS := -dynamiclib
-  LDFLAGS += -L/Applications/MATLAB_R2011b.app/bin/maci64
-  LDFLAGS += -L/usr/local/Cellar/gfortran/4.8.1/gfortran/lib/gcc/x86_64-apple-darwin12.3.0/4.8.1/../../../
+  LDFLAGS += -L/Applications/MATLAB_R2014a.app/bin/maci64
+  LDFLAGS += -L/usr/local/Cellar/gfortran/4.8.2/gfortran/lib
   LDFLAGS += -lmwblas -lgfortran
 else
   # settins for linux
