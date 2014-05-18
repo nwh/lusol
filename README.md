@@ -80,6 +80,12 @@ correct version of `gcc`.  On Mac OS X 10.9 the selected compiler must be
 
   [MC]: http://www.mathworks.com/support/compilers/
 
+### Install `gfortran-4.3` on Mac OS X
+
+1. Install [Homebrew][HB]
+2. `$ brew tap homebrew/versions`
+3. `$ brew install gcc43 --enable-fortran`
+
 ### Steps
 
 From the base directory:
