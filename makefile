@@ -8,14 +8,14 @@ DARWIN := $(strip $(findstring darwin, $(OSLOWER)))
 # C compiler
 ifneq ($(DARWIN),)
   # C compiler for osx
-	CC := clang
-	CPPFLAGS :=
-	CFLAGS := -fPIC
+  CC := clang
+  CPPFLAGS :=
+  CFLAGS := -fPIC
 else
   # C compiler for linux
-	CC := gcc
-	CPPFLAGS :=
-	CFLAGS := -fPIC
+  CC := gcc
+  CPPFLAGS :=
+  CFLAGS := -fPIC
 endif
 
 # Fortran optimization level
@@ -52,14 +52,14 @@ endif
 # Linker
 ifneq ($(DARWIN),)
   # settings for mac os x
-	LD := clang
+  LD := clang
   LIB_SUFFIX := dylib
   LDFLAGS := -dynamiclib
   LDFLAGS += -L/Applications/MATLAB_R2014a.app/bin/maci64 -lmwblas
   LDFLAGS += -L/Applications/MATLAB_R2014a.app/sys/os/maci64 -lgfortran
 else
   # settins for linux
-	LD := gcc
+  LD := gcc
   LIB_SUFFIX := so
   LDFLAGS := -shared -lgfortran
 endif
