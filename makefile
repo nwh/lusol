@@ -100,7 +100,7 @@ F77_OBJ := $(patsubst %.f,%.o,$(filter %.f,$(F77_FILES)))
 
 # default target to build everything
 .PHONY: all
-all: lib/libclusol.$(LIB_SUFFIX) include/clusol.h
+all: lib/libclusol.$(LIB_SUFFIX) include/clusol.h matlab
 
 # pattern to compile fortran 77 files
 $(F77_OBJ) : %.o : %.f

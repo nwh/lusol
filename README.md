@@ -15,7 +15,7 @@ The code is distributed under the terms of the [Common Public License][CPL].
 
 * `gen/`: code generation scripts and specification files
 * `matlab/`: Matlab interface code
-* `src/`: LUSOL fortran code
+* `src/`: LUSOL Fortran code
 * `LICENSE`: [Common Public License][CPL]
 * `makefile`: GNU Make file to build interface
 
@@ -33,6 +33,16 @@ If the interface has not been built, please follow the directions below.
 
 ## Build
 
+### Environment
+
+The build environments as of 2014-05-18 are:
+
+- Fedora 21 & Matlab 2013b
+- Mac OS X 10.9 & Matlab 2014a
+
+Building the LUSOL interface in other environments may require modification of
+`makefile` and `matlab/lusol_build.m`.
+
 ### Requirements
 
 Linux:
@@ -44,41 +54,31 @@ Linux:
 
 Mac:
 
-* [Command Line Tools for Xcode][CLT] or [Xcode][XC] for `gcc` and `make`
-* `gfortran` (possibly via [Homebrew][HB])
+* [Xcode][XC] for `clang` and `make`
+* `gfortran-4.3` (possibly via [Homebrew][HB])
 * Matlab
 
   [HB]: http://brew.sh/
-  [CLT]: https://developer.apple.com/downloads
   [XC]: http://itunes.apple.com/us/app/xcode/id497799835
 
-Note: `python3` is required to generate the interface code.  However, the
-interface code is pre-generated and included in the repository.
+Notes:
 
-### Notes
+* The `matlab` binary must be on the system `PATH`.
+* `python3` is required to generate the interface code.  However, the interface
+  code is pre-generated and included in the repository.
+* It may be necessary to launch Xcode and accept the license agreement before
+  building the interface.
 
-The basic requirements to build LUSOL are GNU `make`, `gfortran`, `gcc`, and
-Matlab. The `makefile` has been tested with Matlab R2011b on [CentOS 6][CENTOS],
-[Ubuntu 12.10][UBUNTU], and Mac OS X 10.8.
+### Setup `mex`
 
-It may be necessary to modify the compiler variables in the `makefile` (`CC`,
-`F90C`, and `F77C`) depending on the operating system and environment.  For
-example, [Ubuntu 12.10][UBUNTU] requires GCC version 4.4.
+Matlab's `mex` compiler driver must be configured to use the appropriate `C`
+compiler.  This can be achieved by executing `mex -setup` from the Matlab prompt
+or operating system terminal.  On Linux the selected compiler must be the
+correct version of `gcc`.  On Mac OS X 10.9 the selected compiler must be
+`clang`.  It is a good idea to match the compiler suggested on the Mathworks
+[supported compilers][MC] page.
 
-The `matlab` executable must be on the system path.  On Mac OS X with Matlab
-R2011b this is achieved with:
-
-```
-$ export PATH=/Applications/MATLAB_R2011b.app/bin:$PATH
-```
-
-The `makefile` may have to be modified on Mac OS X depending on versions of
-Matlab and `gfortran`.  The [`LDFLAGS`][LDFLAGS] need to point to the proper
-directories for Matlab and `gfortran` shared libraries.
-
-  [LDFLAGS]: https://github.com/nwh/lusol/blob/master/makefile#L38
-  [CENTOS]: http://www.centos.org/
-  [UBUNTU]: http://releases.ubuntu.com/12.10/
+  [MC]: http://www.mathworks.com/support/compilers/
 
 ### Steps
 
@@ -88,29 +88,29 @@ From the base directory:
 $ make
 ```
 
-Linux output from 2013-07-31:
+Mac OS X output from 2014-05-18:
 
 ```
 $ make
-gcc  -fPIC -c src/clusol.c -o src/clusol.o
-gfortran -fPIC -Jsrc -c src/lusol_precision.f90 -o src/lusol_precision.o
-gfortran -fPIC -Jsrc -c src/lusol.f90 -o src/lusol.o
-gfortran -fPIC -fdefault-integer-8 -c src/lusol_util.f -o src/lusol_util.o
-gfortran -fPIC -fdefault-integer-8 -c src/lusol6b.f -o src/lusol6b.o
-gfortran -fPIC -fdefault-integer-8 -c src/lusol7b.f -o src/lusol7b.o
-gfortran -fPIC -fdefault-integer-8 -c src/lusol8b.f -o src/lusol8b.o
-gcc src/clusol.o src/lusol.o src/lusol_precision.o src/lusol_util.o src/lusol6b.o src/lusol7b.o src/lusol8b.o -o src/libclusol.so -shared -lgfortran
+clang  -fPIC -c src/clusol.c -o src/clusol.o
+gfortran-4.3 -fPIC -Jsrc -O3 -c src/lusol_precision.f90 -o src/lusol_precision.o
+gfortran-4.3 -fPIC -Jsrc -O3 -c src/lusol.f90 -o src/lusol.o
+gfortran-4.3 -fPIC -fdefault-integer-8 -O3 -c src/lusol_util.f -o src/lusol_util.o
+gfortran-4.3 -fPIC -fdefault-integer-8 -O3 -c src/lusol6b.f -o src/lusol6b.o
+gfortran-4.3 -fPIC -fdefault-integer-8 -O3 -c src/lusol7b.f -o src/lusol7b.o
+gfortran-4.3 -fPIC -fdefault-integer-8 -O3 -c src/lusol8b.f -o src/lusol8b.o
+clang src/clusol.o src/lusol.o src/lusol_precision.o src/lusol_util.o src/lusol6b.o src/lusol7b.o src/lusol8b.o -o src/libclusol.dylib -dynamiclib -L/Applications/MATLAB_R2014a.app/bin/maci64 -lmwblas -L/Applications/MATLAB_R2014a.app/sys/os/maci64 -lgfortran
 mkdir -p lib
-cp src/libclusol.so lib/libclusol.so
+cp src/libclusol.dylib lib/libclusol.dylib
 mkdir -p include
 cp src/clusol.h include/clusol.h
-cp src/libclusol.so src/clusol.h ./matlab/
+cp src/libclusol.dylib src/clusol.h ./matlab/
 matlab -nojvm -nodisplay -r "cd matlab; lusol_build; exit"
 
                             < M A T L A B (R) >
-                  Copyright 1984-2011 The MathWorks, Inc.
-                    R2011b (7.13.0.564) 64-bit (glnxa64)
-                              August 13, 2011
+                  Copyright 1984-2014 The MathWorks, Inc.
+                     R2014a (8.3.0.532) 64-bit (maci64)
+                             February 11, 2014
 
 
 To get started, type one of these: helpwin, helpdesk, or demo.
@@ -125,16 +125,16 @@ From the base directory:
 $ make matlab_test
 ```
 
-Linux output from 2013-07-31:
+Mac OS X output from 2014-05-18:
 
 ```
 $ make matlab_test
 matlab -nojvm -nodisplay -r "cd matlab; lusol_test; exit"
 
                             < M A T L A B (R) >
-                  Copyright 1984-2011 The MathWorks, Inc.
-                    R2011b (7.13.0.564) 64-bit (glnxa64)
-                              August 13, 2011
+                  Copyright 1984-2014 The MathWorks, Inc.
+                     R2014a (8.3.0.532) 64-bit (maci64)
+                             February 11, 2014
 
 
 To get started, type one of these: helpwin, helpdesk, or demo.
@@ -153,6 +153,26 @@ test_reprow_lhr02: passed
 test_solveA_lhr02: passed
 test_solveAt_lhr02: passed
 ```
+
+### Notes
+
+The basic requirements to build LUSOL are GNU `make`, `gfortran`, a C compiler,
+and Matlab.  The build works with `gcc` on Linux and `clang` on Mac OS X.  It
+may be necessary to modify the compiler variables in the `makefile` (`CC`,
+`F90C`, and `F77C`) depending on the operating system and environment.
+
+The `matlab` executable must be on the system path.  On Mac OS X with Matlab
+R2014a this is achieved with:
+
+```
+$ export PATH=/Applications/MATLAB_R2014a.app/bin:$PATH
+```
+
+The `makefile` may have to be modified on Mac OS X depending on versions of
+Matlab and `gfortran`.  The [`LDFLAGS`][LDFLAGS] need to point to the proper
+directories for Matlab `blas` and `gfortran` shared libraries.
+
+  [LDFLAGS]: https://github.com/nwh/lusol/blob/master/makefile#L58
 
 ## Authors
 
