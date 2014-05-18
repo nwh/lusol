@@ -6,17 +6,37 @@ OSLOWER := $(shell uname -s 2>/dev/null | tr [:upper:] [:lower:])
 DARWIN := $(strip $(findstring darwin, $(OSLOWER)))
 
 # C compiler
-CC := gcc
-CPPFLAGS :=
-CFLAGS := -fPIC
+ifneq ($(DARWIN),)
+  # C compiler for osx
+	CC := clang
+	CPPFLAGS :=
+	CFLAGS := -fPIC
+else
+  # C compiler for linux
+	CC := gcc
+	CPPFLAGS :=
+	CFLAGS := -fPIC
+endif
 
-# Fortran 90 compiler
-F90C := gfortran
-F90FLAGS := -fPIC -Jsrc
+# Fortran optimization level
+FOPT := -O3
 
-# Fortran 77 compiler
-F77C := gfortran
-F77FLAGS := -fPIC -fdefault-integer-8
+# Fortran compilers
+ifneq ($(DARWIN),)
+  # Fortran 90 compiler
+  F90C := gfortran-4.3
+  F90FLAGS := -fPIC -Jsrc $(FOPT)
+  # Fortran 77 compiler
+  F77C := gfortran-4.3
+  F77FLAGS := -fPIC -fdefault-integer-8 $(FOPT)
+else
+  # Fortran 90 compiler
+  F90C := gfortran
+  F90FLAGS :=  -fPIC -Jsrc $(FOPT)
+  # Fortran 77 compiler
+  F77C := gfortran
+  F77FLAGS := -fPIC -fdefault-integer-8 $(FOPT)
+endif
 
 # Matlab
 ML := matlab
@@ -30,16 +50,16 @@ else
 endif
 
 # Linker
-LD := gcc
 ifneq ($(DARWIN),)
   # settings for mac os x
+	LD := clang
   LIB_SUFFIX := dylib
   LDFLAGS := -dynamiclib
-  LDFLAGS += -L/Applications/MATLAB_R2014a.app/bin/maci64
-  LDFLAGS += -L/usr/local/Cellar/gfortran/4.8.2/gfortran/lib
-  LDFLAGS += -lmwblas -lgfortran
+  LDFLAGS += -L/Applications/MATLAB_R2014a.app/bin/maci64 -lmwblas
+  LDFLAGS += -L/Applications/MATLAB_R2014a.app/sys/os/maci64 -lgfortran
 else
   # settins for linux
+	LD := gcc
   LIB_SUFFIX := so
   LDFLAGS := -shared -lgfortran
 endif
@@ -75,9 +95,12 @@ F77_FILES := \
 
 F77_OBJ := $(patsubst %.f,%.o,$(filter %.f,$(F77_FILES)))
 
+# set the default goal
+.DEFAULT_GOAL := all
+
 # default target to build everything
 .PHONY: all
-all: lib/libclusol.$(LIB_SUFFIX) include/clusol.h $(MATLAB_FILES)
+all: lib/libclusol.$(LIB_SUFFIX) include/clusol.h
 
 # pattern to compile fortran 77 files
 $(F77_OBJ) : %.o : %.f
