@@ -31,6 +31,37 @@ If the interface has not been built, please follow the directions below.
   [RELEASE]: https://github.com/nwh/lusol/releases
   [ADDPATH]: http://www.mathworks.com/help/matlab/ref/addpath.html
 
+## Basic usage
+
+In Matlab:
+
+```
+% get L and U factors
+[L U P Q] = lusol(A);
+```
+
+See `>>> help lusol`.
+
+## Advanced usage
+
+In Matlab:
+
+```
+% create lusol object
+mylu = lusol_obj(A);
+
+% solve with lusol object (ie x = A\b)
+x = mylu.solveA(b);
+
+% update factorization to replace a column
+mylu.repcol(v,1);
+
+% solve again with updated factorization
+x1 = mylu.solveA(b);
+```
+
+See `>>> help lusol_obj`.
+
 ## Build
 
 ### Environment
