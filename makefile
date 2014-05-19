@@ -88,7 +88,7 @@ INTERFACE_FILES := \
 
 # list of F77 code files
 F77_FILES := \
-	src/lusol_util.f \
+  src/lusol_util.f \
   src/lusol6b.f \
   src/lusol7b.f \
   src/lusol8b.f
