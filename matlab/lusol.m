@@ -1,7 +1,7 @@
 function [L U P Q] = lusol(A,pm_opt,varargin)
   %LUSOL  performs LU factorization with LUSOL, returns L and U factors
   %
-  % This this function if you want direct access to the L and U factors as
+  % Use this function if you want direct access to the L and U factors as
   % computed by LUSOL fortran routines.
   %
   % Basic usage:
