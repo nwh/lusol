@@ -97,8 +97,10 @@ Notes:
 * The `matlab` binary must be on the system `PATH`.
 * `python3` is required to generate the interface code.  However, the interface
   code is pre-generated and included in the repository.
-* It may be necessary to launch Xcode and accept the license agreement before
+* It is necessary to launch Xcode and accept the license agreement before
   building the interface.
+* The smaller Xcode Command Line Tools package does not appear to work with
+  Matlab 2014a.  The full Xcode install is required.
 
 ### Setup `mex`
 
@@ -153,6 +155,10 @@ matlab -nojvm -nodisplay -r "cd matlab; lusol_build; exit"
 To get started, type one of these: helpwin, helpdesk, or demo.
 For product information, visit www.mathworks.com.
 ```
+
+Note: As of 2014-10-29, the `lusol_build` script emits a warning message.  This
+may have something to do with updated header files in the Xcode package.  The
+tests still pass.
 
 ### Test
 

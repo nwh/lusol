@@ -7,8 +7,16 @@ function lusol_build
   end
   
   % load the library to generate proto and thunk files
-  loadlibrary('libclusol','clusol.h','notempdir');
+  [notfound, warnings] = loadlibrary('libclusol','clusol.h','notempdir');
 
+  if ~isempty(notfound)
+    error('lusol_build:loadlibrary','functions missing from library');
+  end
+  
+  if ~isempty(warnings)
+    warning('lusol_build:loadlibrary','loadlibrary returned warning messages:\n%s\n',warnings);
+  end
+  
   % rename the thunk file
   movefile('libclusol_proto.m',['libclusol_proto_' lower(computer) '.m'])
 
