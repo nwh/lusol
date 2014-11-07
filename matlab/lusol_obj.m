@@ -1072,8 +1072,8 @@ classdef lusol_obj < handle
       % handle optional generation of permutation matrices
       if matrflg
         % construct and return sparse permutation matrices
-        p = sparse((1:n)',p,1,n,n);
-        q = sparse(q,(1:m)',1,m,m);
+        p = sparse((1:m)',p,1,m,m);
+        q = sparse(q,(1:n)',1,n,n);
       end
     end
 
@@ -1156,7 +1156,7 @@ classdef lusol_obj < handle
       % handle optional conversion of permuation vector to matrix
       if matrflg
         % construct and return sparse permutation matrix
-        p = sparse((1:n)',p,1);
+        p = sparse((1:m)',p,1);
       end
     end
 
