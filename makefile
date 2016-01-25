@@ -24,10 +24,10 @@ FOPT := -O3
 # Fortran compilers
 ifneq ($(DARWIN),)
   # Fortran 90 compiler
-  F90C := gfortran-4.3
+  F90C := gfortran
   F90FLAGS := -fPIC -Jsrc $(FOPT)
   # Fortran 77 compiler
-  F77C := gfortran-4.3
+  F77C := gfortran
   F77FLAGS := -fPIC -fdefault-integer-8 $(FOPT)
 else
   # Fortran 90 compiler
@@ -55,8 +55,8 @@ ifneq ($(DARWIN),)
   LD := clang
   LIB_SUFFIX := dylib
   LDFLAGS := -dynamiclib
-  LDFLAGS += -L/Applications/MATLAB_R2014a.app/bin/maci64 -lmwblas
-  LDFLAGS += -L/Applications/MATLAB_R2014a.app/sys/os/maci64 -lgfortran
+  LDFLAGS += -L/Applications/MATLAB_R2015b.app/bin/maci64 -lmwblas
+  LDFLAGS += -L/Applications/MATLAB_R2015b.app/sys/os/maci64 -lgfortran
 else
   # settins for linux
   LD := gcc

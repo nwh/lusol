@@ -35,13 +35,22 @@
 !              much more efficiently.  Three new local arrays needed:
 !              markc(n) and markr(m) in lu1fad, and cols(n) in lu1mxr.
 !              This is easy in f90.
+! 28 Sep 2015: lu1fad: Change 2 * lenD to 3 * lenD for safety.
+! 13 Nov 2015: lu6chk: Remove resetting of Utol1 for TRP
+!              to prevent slacks replacing slacks when DUmax is big.
+! 12 Dec 2015: lu1slk called before lu1fad to set nslack.
+!              lu1fad grabs slacks first during Utri.
+! 13 Dec 2015: lu1mxc now handles empty columns correctly.
+! 20 Dec 2015: lu1rec returns ilast as output parameter.
+! 21 Dec 2015: lu1DCP exits if aijmax <= small.
+! 20 Jan 2016: sn28lusol.f90 updated to match sn27lu.f of 21 Dec 2015.
+! 25 Jan 2016: File renamed to lusol.f90 for inclusion into Matlab interface.
+!              Module renamed to lusol for inclusion into Matlab interface.
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 module lusol
-  use  lusol_precision, only : ip, rp
-! use  snModuleIO,        only : snPRNT
-! use  snModuleWork,      only : snAj  , snWork
-! use  sn15blas,          only : idamax
+  use  lusol_precision
+! use  snConstants
 
   implicit none
   private
@@ -77,23 +86,31 @@ contains
   ! 26 Mar 2006: lu1fad: Ignore nsing from lu1ful.
   !              lu1DPP: nsing redefined (but not used by lu1fad).
   !              lu1DCP: nsing redefined (but not used by lu1fad).
+  ! 13 Dec 2015: lu1mxc bug on empty cols (setting a(lc) = 0.0).
+  !              TRO11X3 starts with col 57 containing two nonzeros = 1e-18.
+  !              col 58 is already empty, so col 59 (a slack -1.0) got incorrectly
+  !              changed to 0.0.  This explains Matlab error on data with empty cols.
+  !              lu1mxc fixed.  TRP and TCP ok now on TRO11X3.
+  ! 20 Jan 2016: Current version of lusol1.f90.
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine lu1fac( m    , n    , nelem, lena , luparm, parmlu, &
-                     a    , indc , indr , p    , q     ,         &
-                     lenc , lenr , locc , locr ,                 &
+  subroutine lu1fac( m    , n    , nelem, lena , luparm, parmlu,       &
+                     a    , indc , indr , p    , q     ,               &
+                     lenc , lenr , locc , locr ,                       &
                      iploc, iqloc, ipinv, iqinv, w     , inform )
 
     integer(ip),   intent(in)    :: m, n, nelem, lena
+
     integer(ip),   intent(inout) :: luparm(30)
-    integer(ip),   intent(out)   :: inform
-    real(rp),      intent(inout) :: parmlu(30), a(lena), w(n)
-    integer(ip),   intent(inout) :: indc(lena), indr(lena), &
-                                    p(m)      , q(n)      , &
-                                    lenc(n)   , lenr(m)   , &
-                                    iploc(n)  , iqloc(m)  , &
-                                    ipinv(m)  , iqinv(n)  , &
+    integer(ip),   intent(inout) :: indc(lena), indr(lena),            &
+                                    p(m)      , q(n)      ,            &
+                                    lenc(n)   , lenr(m)   ,            &
+                                    iploc(n)  , iqloc(m)  ,            &
+                                    ipinv(m)  , iqinv(n)  ,            &
                                     locc(n)   , locr(m)
+    real(rp),      intent(inout) :: parmlu(30), a(lena), w(n)
+
+    integer(ip),   intent(out)   :: inform
 
     !------------------------------------------------------------------
     ! lu1fac computes a factorization A = L*U, where A is a sparse
@@ -363,6 +380,7 @@ contains
     !         = 9 if no diagonal pivot could be found with TSP or TDP.
     !             The matrix must not be sufficiently definite
     !             or quasi-definite.
+    !         =10 if there was some other fatal error.
     !
     !  luparm output parameters:
     !
@@ -389,7 +407,7 @@ contains
     !  luparm(27) = mersum   lu1fac: sum of Markowitz merit counts.
     !  luparm(28) = nUtri    lu1fac: triangular rows in U.
     !  luparm(29) = nLtri    lu1fac: triangular rows in L.
-    !  luparm(30) =
+    !  luparm(30) = nslack   lu1fac: no. of unit vectors at start of U. (info only)
     !
     !
     !
@@ -413,23 +431,22 @@ contains
 
     character(1)           :: mnkey
     character(2)           :: kPiv(0:3)
-    integer(ip)            :: i, idummy, j, jsing, jumin,   &
-                              k, l, l2, lena2, lenH, lenL,  &
-                              lenLk, lenU, lenUk, lerr,     &
-                              ll, llsave, lm, lmaxr, locH,  &
-                              lprint, lPiv, lrow, ltopl,    &
-                              lu, mersum, minlen, nbump,    &
-                              ncp, ndens1, ndens2,          &
-                              nLtri, nmove, nout, nrank,    &
-                              nsing, numl0, numnz, nUtri
+    integer(ip)            :: i, idummy, j, jsing, jumin,              &
+                              k, l, l2, lena2, lenH, lenL,             &
+                              lenLk, lenU, lenUk, lerr,                &
+                              ll, llsave, lm, lmaxr, locH,             &
+                              lprint, lPiv, lrow, ltopl,               &
+                              lu, mersum, minlen, nbump,               &
+                              ncp, ndens1, ndens2,                     &
+                              nLtri, nmove, nout, nrank,               &
+                              nsing, numl0, numnz, nslack, nUtri
     logical                :: keepLU, TCP, TPP, TRP, TSP
-    real(rp)               :: Agrwth, Akmax, Amax, avgmer,  &
-                              condU, delem, densty, dincr,  &
-                              dm, dn, DUmax, DUmin, growth, &
-                              Lmax, Ltol, small, Ugrwth,    &
+    real(rp)               :: Agrwth, Akmax, Amax, avgmer,             &
+                              condU, delem, densty, dincr,             &
+                              dm, dn, DUmax, DUmin, growth,            &
+                              Lmax, Ltol, small, Ugrwth,               &
                               Umax
     integer(ip), parameter :: i1 = 1
-    real(rp),    parameter :: zero = 0.0,  one = 1.0
 
 
     ! Grab relevant input parameters.
@@ -468,6 +485,7 @@ contains
     nsing  = 0
     jsing  = 0
     jumin  = 0
+    nslack = 0
 
     Amax   = zero
     Lmax   = zero
@@ -504,13 +522,13 @@ contains
     !         (same indices  i,j).
     ! lu1or4  constructs a row list from the column list.
     !-------------------------------------------------------------------
-    call lu1or1( m   , n    , nelem, lena , small, &
-                 a   , indc , indr , lenc , lenr,  &
+    call lu1or1( m   , n    , nelem, lena , small,                     &
+                 a   , indc , indr , lenc , lenr,                      &
                  Amax, numnz, lerr , inform )
 
     if (nout > 0  .and.  lprint >= 10) then
        densty = 100.0_rp * delem / (dm * dn)
-       write(nout, 1000) m, mnkey, n, nelem, Amax, densty
+       write(nout, 1000) m, mnkey, n, numnz, Amax, densty
     end if
     if (inform /= 0) go to 930
 
@@ -527,14 +545,22 @@ contains
     !------------------------------------------------------------------
     ! Set up lists of rows and columns with equal numbers of nonzeros,
     ! using  indc(*)  as workspace.
+    ! 12 Dec 2015: Always call lu1slk here now.
+    ! This sets nslack and w(j) = 1.0 for slacks, else 0.0.
     !------------------------------------------------------------------
     call lu1pq1( m, n, lenr, p, iploc, ipinv, indc(numnz + 1) )
     call lu1pq1( n, m, lenc, q, iqloc, iqinv, indc(numnz + 1) )
+    call lu1slk( m, n, lena, q, iqloc, a, indc, locc, nslack, w )
+    luparm(30) = nslack
 
     !------------------------------------------------------------------
     ! For TCP, allocate Ha, Hj, Hk at the end of a, indc, indr.
     ! Then compute the factorization  A = L*U.
     !------------------------------------------------------------------
+    lenH   = 0                ! Keep -Wmaybe-uninitialized happy.
+    lena2  = 0                !
+    locH   = 0                !
+    lmaxr  = 0                !
     if (TPP .or. TSP) then
        lenH   = 1
        lena2  = lena
@@ -552,19 +578,20 @@ contains
        lmaxr  = 1             ! Dummy
     end if
 
-    call lu1fad( m     , n     , numnz , lena2 , luparm, parmlu,   &
-                 a     , indc  , indr  , p     , q     ,           &
-                 lenc  , lenr  , locc  , locr  ,                   &
-                 iploc , iqloc , ipinv , iqinv , w     ,           &
-                 lenH  ,a(locH), indc(locH), indr(locH), a(lmaxr), &
-                 inform, lenL  , lenU  , minlen, mersum,           &
-                 nUtri , nLtri , ndens1, ndens2, nrank ,           &
+    call lu1fad( m     , n     , numnz , lena2 , luparm, parmlu,       &
+                 a     , indc  , indr  , p     , q     ,               &
+                 lenc  , lenr  , locc  , locr  ,                       &
+                 iploc , iqloc , ipinv , iqinv , w     ,               &
+                 lenH  ,a(locH), indc(locH), indr(locH), a(lmaxr),     &
+                 inform, lenL  , lenU  , minlen, mersum,               &
+                 nUtri , nLtri , ndens1, ndens2, nrank , nslack,       &
                  Lmax  , Umax  , DUmax , DUmin , Akmax )
 
     luparm(16) = nrank
     luparm(23) = lenL
     if (inform == 7) go to 970
     if (inform == 9) go to 985
+    if (inform ==10) go to 981
     if (inform >  0) go to 980
 
     if ( keepLU ) then
@@ -649,13 +676,8 @@ contains
        ! Save the lengths of the nonempty columns of  L,
        ! and initialize  locc(j)  for the LU update routines.
        !---------------------------------------------------------------
-       do k = 1, numl0
-          lenc(k) = iqloc(k)
-       end do
-
-       do j = 1, n
-          locc(j) = 0
-       end do
+       lenc(1:numl0) = iqloc(1:numl0)
+       locc(1:n)     = 0
 
        !---------------------------------------------------------------
        ! Test for singularity.
@@ -663,9 +685,10 @@ contains
        ! (including entries from the dense LU).
        ! input      i1 = 1 means we're calling lu6chk from LUSOL.
        ! output inform = 1 if there are singularities (nsing > 0).
+       ! 12 Dec 2015: nslack is now an input.
        !---------------------------------------------------------------
-       call lu6chk( i1, m, n, w, lena, luparm, parmlu, &
-                    a, indc, indr, p, q,               &
+       call lu6chk( i1, m, n, nslack, w, lena, luparm, parmlu,         &
+                    a, indc, indr, p, q,                               &
                     lenc, lenr, locc, locr, inform )
        nsing  = luparm(11)
        jsing  = luparm(12)
@@ -683,9 +706,10 @@ contains
        !              but we want to keep Lmax, Umax from lu1fad.
        ! 05 May 2002: Allow for TCP with new lu1DCP.  Diag(U) starts
        !              below lena2, not lena.  Need lena2 in next line.
+       ! 12 Dec 2015: nslack is now an input.
        !---------------------------------------------------------------
-       call lu6chk( i1, m, n, w, lena2, luparm, parmlu, &
-                    a, indc, indr, p, q,             &
+       call lu6chk( i1, m, n, nslack, w, lena2, luparm, parmlu,        &
+                    a, indc, indr, p, q,                               &
                     lenc, lenr, locc, locr, inform )
        nsing  = luparm(11)
        jsing  = luparm(12)
@@ -713,6 +737,9 @@ contains
 
 980 inform = 8
     if (lprint >= 0) write(nout, 1800)
+    go to 990
+
+981 inform = 10
     go to 990
 
 985 inform = 9
@@ -768,14 +795,14 @@ contains
 
     if (nout > 0  .and.  lprint >= 10) then
        if ( TPP ) then
-          write(nout, 1100) avgmer, lenL, lenL+lenU, ncp, dincr, &
-                            nUtri, lenU, Ltol, Umax, Ugrwth,     &
+          write(nout, 1100) avgmer, lenL, lenL+lenU, ncp, dincr,       &
+                            nUtri, lenU, Ltol, Umax, Ugrwth,           &
                             nLtri, ndens1, Lmax
 
        else
-          write(nout, 1120) kPiv(lPiv), avgmer,                  &
-                            lenL, lenL+lenU, ncp, dincr,         &
-                            nUtri, lenU, Ltol, Umax, Ugrwth,     &
+          write(nout, 1120) kPiv(lPiv), avgmer,                        &
+                            lenL, lenL+lenU, ncp, dincr,               &
+                            nUtri, lenU, Ltol, Umax, Ugrwth,           &
                             nLtri, ndens1, Lmax, Akmax, Agrwth
        end if
 
@@ -784,55 +811,60 @@ contains
 
     return
 
-1000 format(' m', i12, ' ', a, 'n', i12, '  Elems', i9,    &
+1000 format(' m', i12, ' ', a, 'n', i12, '  Elems', i9,                &
             '  Amax', es10.1, '  Density', f7.2)
-1100 format(' Merit', f8.1, '  lenL', i9, '  L+U', i11,    &
-            '  Cmpressns', i5, '  Incres', f8.2            &
-      /     ' Utri', i9, '  lenU', i9, '  Ltol', es10.2,   &
-            '  Umax', es10.1, '  Ugrwth', es8.1            &
+1100 format(' Merit', f8.1, '  lenL', i9, '  L+U', i11,                &
+            '  Cmpressns', i5, '  Incres', f8.2                        &
+      /     ' Utri', i9, '  lenU', i9, '  Ltol', es10.2,               &
+            '  Umax', es10.1, '  Ugrwth', es8.1                        &
       /     ' Ltri', i9, '  dense1', i7, '  Lmax', es10.2)
-1120 format(' Mer', a2, f8.1, '  lenL', i9, '  L+U', i11,  &
-            '  Cmpressns', i5, '  Incres', f8.2            &
-      /     ' Utri', i9, '  lenU', i9, '  Ltol', es10.2,   &
-            '  Umax', es10.1, '  Ugrwth', es8.1            &
-      /     ' Ltri', i9, '  dense1', i7, '  Lmax', es10.2, &
+1120 format(' Mer', a2, f8.1, '  lenL', i9, '  L+U', i11,              &
+            '  Cmpressns', i5, '  Incres', f8.2                        &
+      /     ' Utri', i9, '  lenU', i9, '  Ltol', es10.2,               &
+            '  Umax', es10.1, '  Ugrwth', es8.1                        &
+      /     ' Ltri', i9, '  dense1', i7, '  Lmax', es10.2,             &
             '  Akmax', es9.1, '  Agrwth', es8.1)
-1200 format(' bump', i9, '  dense2', i7, '  DUmax', es9.1, &
+1200 format(' bump', i9, '  dense2', i7, '  DUmax', es9.1,             &
             '  DUmin', es9.1, '  condU', es9.1)
 1300 format(/ ' lu1fac  error...  entry  a(', i8, ')  has an illegal', &
-              ' row or column index' &
+              ' row or column index'                                   &
             //' indc, indr =', 2i8)
-1400 format(/ ' lu1fac  error...  entry  a(', i8, ')  has the same', &
-              ' indices as an earlier entry' &
+1400 format(/ ' lu1fac  error...  entry  a(', i8, ')  has the same',   &
+              ' indices as an earlier entry'                           &
             //' indc, indr =', 2i8)
-1700 format(/ ' lu1fac  error...  insufficient storage' &
+1700 format(/ ' lu1fac  error...  insufficient storage'                &
             //' Increase  lena  from', i10, '  to at least', i10)
-1800 format(/ ' lu1fac  error...  fatal bug', &
+1800 format(/ ' lu1fac  error...  fatal bug',                          &
               '   (sorry --- this should never happen)')
-1900 format(/ ' lu1fac  error...  TSP used but', &
+1900 format(/ ' lu1fac  error...  TSP used but',                       &
               ' diagonal pivot could not be found')
 
   end subroutine lu1fac
 
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine lu1fad( m     , n     , nelem , lena  , luparm, parmlu, &
-                     a     , indc  , indr  , p     , q     ,         &
-                     lenc  , lenr  , locc  , locr  ,                 &
-                     iploc , iqloc , ipinv , iqinv , w     ,         &
-                     lenH  , Ha    , Hj    , Hk    , Amaxr ,         &
-                     inform, lenL  , lenU  , minlen, mersum,         &
-                     nUtri , nLtri , ndens1, ndens2, nrank ,         &
+  subroutine lu1fad( m     , n     , nelem , lena  , luparm, parmlu,   &
+                     a     , indc  , indr  , p     , q     ,           &
+                     lenc  , lenr  , locc  , locr  ,                   &
+                     iploc , iqloc , ipinv , iqinv , w     ,           &
+                     lenH  , Ha    , Hj    , Hk    , Amaxr ,           &
+                     inform, lenL  , lenU  , minlen, mersum,           &
+                     nUtri , nLtri , ndens1, ndens2, nrank , nslack,   &
                      Lmax  , Umax  , DUmax , DUmin , Akmax )
 
-    integer(ip),   intent(in)    :: m, n, nelem, lena, lenH
+    integer(ip),   intent(in)    :: m, n, nelem, lena, lenH, nslack
     integer(ip),   intent(inout) :: luparm(30)
-    real(rp),      intent(inout) :: parmlu(30), a(lena), Amaxr(m), w(n), Ha(lenH)
-    integer(ip),   intent(inout) :: indc(lena), indr(lena), p(m)    , q(n)    , &
-                                    lenc(n)   , lenr(m)   , locc(n) , locr(m) , &
-                                    iploc(n)  , iqloc(m)  , ipinv(m), iqinv(n), &
+    real(rp),      intent(inout) :: parmlu(30), a(lena), Amaxr(m),     &
+                                    w(n), Ha(lenH)
+    integer(ip),   intent(inout) :: indc(lena), indr(lena),            &
+                                    p(m)    , q(n)    ,                &
+                                    lenc(n)   , lenr(m)   ,            &
+                                    locc(n) , locr(m) ,                &
+                                    iploc(n)  , iqloc(m)  ,            &
+                                    ipinv(m), iqinv(n),                &
                                     Hj(lenH)  , Hk(lenH)
-    integer(ip),   intent(out)   :: inform, lenL  , lenU  , minlen, mersum,     &
+    integer(ip),   intent(out)   :: inform, lenL  , lenU  ,            &
+                                    minlen, mersum,     &
                                     nUtri , nLtri , ndens1, ndens2, nrank
     real(rp),      intent(out)   :: Lmax, Umax, DUmax, DUmin, Akmax
 
@@ -914,10 +946,11 @@ contains
     !                         jlast to record the last col in col file.
     !              lu1rec returns ilast = indr(lrow + 1)
     !                          or jlast = indc(lcol + 1).
-    !              (Should be an output parameter, but didn't want to
+    !        ***   (Should be an output parameter, but didn't want to
     !              alter lu1rec's parameter list.)
     !              lu1rec also treats empty rows or cols safely.
     !              (Doesn't eliminate them!)
+    !        ***   20 Dec 2015: Made ilast an output as it should be.
     !
     ! 26 Apr 2002: Heap routines added for TCP.
     !              lu2max no longer needed.
@@ -938,6 +971,8 @@ contains
     !
     ! 10 Jan 2010: First f90 version.
     ! 03 Apr 2013: lu1mxr recoded to improve efficiency of TRP.
+    ! 12 Dec 2015: nslack is now an input.
+    ! 20 Dec 2015: lu1rec returns ilast as output parameter.
     !------------------------------------------------------------------
 
     logical                :: Utri, Ltri, spars1, spars2, dense,       &
@@ -946,7 +981,6 @@ contains
                               dens1, dens2, diag,          &
                               Lij, Ltol, small, Uspace
     integer(ip), parameter :: i1 = 1
-    real(rp),    parameter :: zero = 0.0,  one = 1.0
 
 
     !------------------------------------------------------------------
@@ -1015,18 +1049,19 @@ contains
     !        than the parameter dens2 = parmlu(8) = 0.6 say.
     !        lu1mar searches maxcol columns and no rows.
     !        lu1mxc could fix up only the first maxcol cols (with TPP).
-    !        22 Sep 2000:  For simplicity, lu1mxc fixes all modified cols.
+    !        22 Sep 2000: For simplicity, lu1mxc fixes all modified cols.
     !
     ! dense  is true once the density of A2 reaches dens2.
     !        lu1mar searches only 1 column (the shortest).
     !        lu1mxc could fix up only the first column (with TPP).
-    !        22 Sep 2000:  For simplicity, lu1mxc fixes all modified cols.
+    !        22 Sep 2000: For simplicity, lu1mxc fixes all modified cols.
     !------------------------------------------------------------------
 
     integer(ip)       :: Hlen, Hlenin, hops, h,                &
                          i, ibest, ilast, imax,                &
                          j, jbest, jlast, jmax, lPiv,          &
-                         k, kbest, kk, l, last, lc, lc1, lcol, &
+                         k, kbest, kk, kslack,                 &
+                         l, last, lc, lc1, lcol,               &
                          lD, ldiagU, lenD, leni, lenj,         &
                          lfile, lfirst, lfree, limit,          &
                          ll, ll1, lpivc, lpivc1, lpivc2,       &
@@ -1063,11 +1098,11 @@ contains
     maxmn  = max( m, n )
     nzleft = nelem
     nspare = 1
+    ldiagU = 0                 ! Keep -Wmaybe-uninitialized happy.
 
     if ( keepLU ) then
        lu1    = lena   + 1
-    else
-       ! Store only the diagonals of U in the top of memory.
+    else ! Store only the diagonals of U in the top of memory.
        ldiagU = lena   - n
        lu1    = ldiagU + 1
     end if
@@ -1082,6 +1117,7 @@ contains
     spars1 = .false.
     spars2 = .false.
     dense  = .false.
+    kslack = 0        ! 12 Dec 2015: Count slacks accepted during Utri.
 
     ! Check parameters.
 
@@ -1089,8 +1125,18 @@ contains
     dens1  = min( dens1, dens2 )
 
     ! Initialize output parameters.
-    ! lenL, lenU, minlen, mersum, nUtri, nLtri, ndens1, ndens2, nrank
-    ! are already initialized by lu1fac.
+    ! lenL, lenU, minlen, mersum, nUtri, nLtri, ndens1, ndens2, nrank,
+    ! nslack, are already initialized by lu1fac.
+
+    lenL   = 0
+    lenU   = 0
+    minlen = 0
+    mersum = 0
+    nLtri  = 0
+    nUtri  = 0
+    ndens1 = 0
+    ndens2 = 0
+    nrank  = 0
 
     Lmax   = zero
     Umax   = zero
@@ -1110,30 +1156,35 @@ contains
     else ! TRP or TCP
        ! Move biggest element to top of each column.
        ! Set w(*) to mark slack columns (unit vectors).
+       ! 12 Dec 2015: lu1fac (lu1slk) sets w(*) before lu1fad.
+       ! 13 Dec 2015: lu1mxc fixed (empty cols caused trouble).
 
        call lu1mxc( i1, n, q, a, indc, lenc, locc )
-       call lu1slk( m, n, lena, q, iqloc, a, locc, w )
+     ! call lu1slk( m, n, lena, q, iqloc, a, locc, w )
     end if
 
-    if (TRP) then
-       ! Find biggest element in each row.
-
+    if (TRP) then ! Find biggest element in each row.
        mark = 0
-       call lu1mxr( mark, i1, m, m, n, lena,               &
+       call lu1mxr( mark, i1, m, m, n, lena, inform,       &
                     a, indc, lenc, locc, indr, lenr, locr, &
                     p, markc, markr, Amaxr )
+       if (inform > 0) go to 981
     end if
 
-    if (TCP) then
-       ! Set Ha(1:Hlen) = biggest element in each column,
-       ! Hj(1:Hlen) = corresponding column indices.
-
+    if (TCP) then ! Set Ha(1:Hlen) = biggest element in each column,
+                  ! Hj(1:Hlen) = corresponding column indices.
+                  ! 17 Dec 2015: Allow for empty columns.
        Hlen  = 0
        do kk = 1, n
           Hlen     = Hlen + 1
           j        = q(kk)
-          lc       = locc(j)
-          Ha(Hlen) = abs( a(lc) )
+          if (lenc(j) > 0) then
+             lc   = locc(j)
+             amax = abs( a(lc) )
+          else
+             amax = zero
+          end if
+          Ha(Hlen) = amax
           Hj(Hlen) = j
           Hk(j)    = Hlen
        end do
@@ -1171,17 +1222,44 @@ contains
        !===============================================================
        ! Find a suitable pivot element.
        !===============================================================
-
        if ( Utri ) then
           !------------------------------------------------------------
           ! So far all columns have had length 1.
           ! We are still looking for the (backward) triangular part of A
           ! that forms the first rows and columns of U.
+          ! 12 Dec 2015: Use nslack and kslack to choose slacks first.
           !------------------------------------------------------------
-
           lq1    = iqloc(1)
           lq2    = n
-          if (m   >   1) lq2 = iqloc(2) - 1
+          if (m > 1) lq2 = iqloc(2) - 1
+
+          if (kslack < nslack) then
+             do lq = lq1, lq2
+                j  = q(lq)
+                if (w(j) > zero) then ! Accept a slack
+                   kslack = kslack + 1
+                   jbest  = j
+                   lc     = locc(jbest)
+                   ibest  = indc(lc)
+                   abest  = a(lc)
+                   mbest  = 0
+                   go to 300
+                end if
+             end do
+
+             ! DEBUG ERROR
+             ! write(*,*) 'slack not found'
+             ! write(*,*) 'kslack, nslack =', kslack, nslack
+             ! stop
+
+          else if (kslack == nslack) then  ! Maybe print msg
+             if (lprint >= 50) then
+                write(nout,*) 'Slacks ended.  nslack =', nslack
+             end if
+             kslack = nslack + 1          ! So print happens once
+          end if
+
+          ! All slacks will be grabbed before we get here.
 
           if (lq1 <= lq2) then  ! There are more cols of length 1.
              if (TPP .or. TSP) then
@@ -1192,10 +1270,11 @@ contains
 
                 do lq = lq1, lq2
                    j      = q(lq)
-                   if (w(j) > zero) then ! Accept a slack
-                      jbest  = j
-                      go to 250
-                   end if
+                   ! 12 Dec 2015: Slacks grabbed earlier.
+                   ! if (w(j) > zero) then ! Accept a slack
+                   !   jbest  = j
+                   !   go to 250
+                   ! end if
 
                    lc     = locc(j)
                    amax   = abs( a(lc) )
@@ -1252,12 +1331,12 @@ contains
                           iploc, iqloc )
 
           else if (TRP) then
-             call lu1mRP( m    , n     , lena  , maxmn,  &
-                       Ltol , maxcol, maxrow,            &
-                       ibest, jbest , mbest ,            &
-                       a    , indc  , indr  , p    , q,  &
-                       lenc , lenr  , locc  , locr ,     &
-                       iploc, iqloc , Amaxr )
+             call lu1mRP( m    , n     , lena  , maxmn,     &
+                          Ltol , maxcol, maxrow,            &
+                          ibest, jbest , mbest ,            &
+                          a    , indc  , indr  , p    , q,  &
+                          lenc , lenr  , locc  , locr ,     &
+                          iploc, iqloc , Amaxr )
 
              ! else if (TCP) then ! Disabled by test above
              ! call lu1mCP( m    , n     , lena  , aijtol, &
@@ -1360,7 +1439,8 @@ contains
           lenD   = mleft * nleft
           nfree  = lu1 - 1
 
-          if (nfree >= 2 * lenD) then
+          ! 28 Sep 2015: Change 2 to 3 for safety.
+          if (nfree >= 3 * lenD) then
 
              ! There is room to treat the remaining matrix as
              ! a dense matrix D.
@@ -1376,9 +1456,9 @@ contains
              ndens2 = nleft
              lD     = lu1 - lenD
              if (lcol >= lD) then
-                call lu1rec( n, .true., luparm, lcol, lena, a, indc, lenc, locc )
+                call lu1rec( n, .true., luparm, lcol, jlast, &
+                             lena, a, indc, lenc, locc )
                 lfile  = lcol
-                jlast  = indc(lcol + 1)
              end if
 
              go to 900
@@ -1386,9 +1466,9 @@ contains
        end if
 
        !===============================================================
-       ! The best  aij  has been found.
-       ! The pivot row  ibest  and the pivot column  jbest
-       ! define a dense matrix  D  of size  nrowd x ncold.
+       ! The best aij has been found.
+       ! The pivot row ibest and the pivot column jbest
+       ! define a dense matrix D of size nrowd x ncold.
        !===============================================================
 300    ncold  = lenr(ibest)
        nrowd  = lenc(jbest)
@@ -1453,9 +1533,9 @@ contains
        minfre = ncold  + melim
        nfree  = lfree  - lcol
        if (nfree < minfre  .or.  lcol > limit) then
-          call lu1rec( n, .true., luparm, lcol, lena, a, indc, lenc, locc )
+          call lu1rec( n, .true., luparm, lcol, jlast, &
+                       lena, a, indc, lenc, locc )
           lfile  = lcol
-          jlast  = indc(lcol + 1)
           nfree  = lfree - lcol
           if (nfree < minfre) go to 970
        end if
@@ -1465,9 +1545,9 @@ contains
        minfre = melim + ncold
        nfree  = lfree - lrow
        if (nfree < minfre  .or.  lrow > limit) then
-          call lu1rec( m, .false., luparm, lrow, lena, a, indr, lenr, locr )
+          call lu1rec( m, .false., luparm, lrow, ilast, &
+                       lena, a, indr, lenr, locr )
           lfile  = lrow
-          ilast  = indr(lrow + 1)
           nfree  = lfree - lrow
           if (nfree < minfre) go to 970
        end if
@@ -1523,8 +1603,8 @@ contains
        !===============================================================
        ! Delete the pivot row from the column file
        ! and store it as the next row of  U.
-       ! set  indr(lu) = 0     to initialize jfill ptrs on columns of D,
-       ! indc(lu) = lenj  to save the original column lengths.
+       ! Set indr(lu) = 0    to initialize jfill ptrs on columns of D,
+       !     indc(lu) = lenj to save the original column lengths.
        !===============================================================
        a(lu1)    = abest
        indr(lu1) = jbest
@@ -1555,7 +1635,7 @@ contains
           a(l)       = a(last)
           indc(l)    = indc(last)
           indc(last) = 0       ! Free entry
-          !??? if (j == jlast) lcol = lcol - 1
+          if (j == jlast) lcol = lcol - 1
        end do
 
        !===============================================================
@@ -1590,7 +1670,7 @@ contains
 
           indr(l)    = indr(last)
           indr(last) = 0       ! Free entry
-          !???  if (i == ilast) lrow = lrow - 1
+          if (i == ilast) lrow = lrow - 1
 
           a(ll)      = - a(lc) * abest
           Lij        = abs( a(ll) )
@@ -1640,9 +1720,9 @@ contains
           ! Compress the column file and try again.
           ! lfirst, lu and nfill have appropriate new values.
 
-          call lu1rec( n, .true., luparm, lcol, lena, a, indc, lenc, locc )
+          call lu1rec( n, .true., luparm, lcol, jlast, &
+                       lena, a, indc, lenc, locc )
           lfile  = lcol
-          jlast  = indc(lcol + 1)
           lpivc  = locc(jbest)
           lpivc1 = lpivc + 1
           lpivc2 = lpivc + melim
@@ -1664,9 +1744,9 @@ contains
           minfre = nfill
           nfree  = lfree - lrow
           if (nfree < minfre) then
-             call lu1rec( m, .false., luparm, lrow, lena, a, indr, lenr, locr )
+             call lu1rec( m, .false., luparm, lrow, ilast, &
+                          lena, a, indr, lenr, locr )
              lfile  = lrow
-             ilast  = indr(lrow + 1)
              lpivr  = locr(ibest)
              lpivr1 = lpivr + 1
              lpivr2 = lpivr + nelim
@@ -1684,7 +1764,7 @@ contains
        end if
 
        !===============================================================
-       ! Restore the saved values of  iqloc.
+       ! Restore the saved values of iqloc.
        ! Insert the correct indices for the col of L and the row of U.
        !===============================================================
 700    lenr(ibest) = 0
@@ -1739,21 +1819,29 @@ contains
        else
           if (TRP  .and.  melim > 0) then
              ! Beware: The parts of p that we need are in indc(ll1:ll)
+             ! 28 Sep 2015: inform is now an output.
+
              mark = mark + 1
-             call lu1mxr( mark, ll1, ll, m, n, lena,             &
+             call lu1mxr( mark, ll1, ll, m, n, lena, inform,     &
                           a, indc, lenc, locc, indr, lenr, locr, &
                           indc, markc, markr, Amaxr )
                         ! ^^^^  Here are the p(k1:k2) needed by lu1mxr.
+             if (inform > 0) go to 981
           end if
 
           if (nelim > 0) then
              call lu1mxc( lu1+1, lu, indr, a, indc, lenc, locc )
 
              if (TCP) then ! Update modified columns in heap
+                ! 20 Dec 2015: Allow for empty columns.
                 do kk = lu1+1, lu
                    j    = indr(kk)
                    k    = Hk(j)
-                   v    = abs( a(locc(j)) ) ! Biggest aij in column j
+                   if (lenc(j) > 0) then
+                      v = abs( a(locc(j)) ) ! Biggest aij in column j
+                   else
+                      v = zero
+                   end if
                    call Hchange( Ha, Hj, Hk, Hlen, n, k, v, j, h )
                    hops = hops + h
                 end do
@@ -1829,6 +1917,11 @@ contains
 980 inform = 8
     go to 990
 
+    ! Fatal error in lu1mxr.  This will never happen!
+
+981 inform = 10
+    go to 990
+
     ! Fatal error with TSP.  Diagonal pivot not found.
 
 985 inform = 9
@@ -1855,11 +1948,12 @@ contains
 
     integer(ip),   intent(in)    :: m, melim, ncold, nspare,          &
                                     lpivc1, lpivc2, lpivr2, lfree, minfre
-    integer(ip),   intent(inout) :: ilast, jlast, lfirst, lrow, lcol, lu, nfill
+    integer(ip),   intent(in)    :: locr(*), mark(*)
     real(rp),      intent(in)    :: small
     real(rp),      intent(in)    :: al(melim), au(ncold)
+
+    integer(ip),   intent(inout) :: ilast, jlast, lfirst, lrow, lcol, lu, nfill
     real(rp),      intent(inout) :: a(*)
-    integer(ip),   intent(in)    :: locr(*), mark(*)
     integer(ip),   intent(inout) :: locc(*), indc(*), indr(*), lenc(*), lenr(*), &
                                     markl(melim), ifill(melim), jfill(ncold)
 
@@ -2023,11 +2117,17 @@ contains
        ! We must move column j to the end of the column file.
        ! First, leave some spare room at the end of the
        ! current last column.
+       ! 14 Jul 2015: (William Gandler) Fix deceptive loop
+       !              do l = lcol + 1, lcol + nspare
+       !                 lcol    = l
 
-520    do l = lcol + 1, lcol + nspare
-          lcol    = l
+520    l1      = lcol + 1
+       l2      = lcol + nspare
+       do l = l1, l2
+       !  lcol    = l
           indc(l) = 0     ! Spare space is free.
        end do
+       lcol    = l2
 
        atend   = .true.
        jlast   = j
@@ -2122,13 +2222,13 @@ contains
                      a    , indc  , indr  , p     , q    ,  &
                      lenc , lenr  , locc  , locr  , iploc, iqloc )
 
-    integer(ip),   intent(in)    :: m, n, lena, maxmn, maxcol, maxrow
-    integer(ip),   intent(out)   :: ibest, jbest, mbest
     logical,       intent(in)    :: TCP
+    integer(ip),   intent(in)    :: m, n, lena, maxmn, maxcol, maxrow
     real(rp),      intent(in)    :: aijtol, Ltol, a(lena)
     integer(ip),   intent(in)    :: indc(lena), indr(lena), p(m)    , q(n)    , &
                                     lenc(n)   , lenr(m)   , iploc(n), iqloc(m), &
                                     locc(n)   , locr(m)
+    integer(ip),   intent(out)   :: ibest, jbest, mbest
 
     !------------------------------------------------------------------
     ! lu1mar  uses a Markowitz criterion to select a pivot element
@@ -2173,7 +2273,7 @@ contains
                               lp, lp1, lp2, lq, lq1, lq2, lr, lr1, lr2, &
                               merit, ncol, nrow, nz, nz1
     real(rp)               :: abest, aij, amax, cmax, lbest
-    real(rp),    parameter :: zero = 0.0,  one = 1.0,  gamma  = 2.0
+    real(rp),    parameter :: gamma  = 2.0
 
     ! gamma  is "gamma" in the tie-breaking rule TB4 in the LUSOL paper.
 
@@ -2430,12 +2530,12 @@ Rowi:     do lr = lr1, lr2
                      iploc, iqloc , Amaxr )
 
     integer(ip),   intent(in)    :: m, n, lena, maxmn, maxcol, maxrow
-    integer(ip),   intent(out)   :: ibest, jbest, mbest
     real(rp),      intent(in)    :: Ltol
     integer(ip),   intent(in)    :: indc(lena), indr(lena), p(m)    , q(n)    , &
                                     lenc(n)   , lenr(m)   , iploc(n), iqloc(m), &
                                     locc(n)   , locr(m)
     real(rp),      intent(in)    :: a(lena)   , Amaxr(m)
+    integer(ip),   intent(out)   :: ibest, jbest, mbest
 
     !------------------------------------------------------------------
     ! lu1mRP  uses a Markowitz criterion to select a pivot element
@@ -2454,7 +2554,6 @@ Rowi:     do lr = lr1, lr2
                               lp, lp1, lp2, lq, lq1, lq2, lr, lr1, lr2, &
                               merit, ncol, nrow, nz, nz1
     real(rp)               :: abest, aij, amax, atoli, atolj
-    real(rp),    parameter :: zero = 0.0
 
 
     !------------------------------------------------------------------
@@ -2642,11 +2741,11 @@ Rowi:     do lr = lr1, lr2
                      Hlen  , Ha    , Hj    )
 
     integer(ip),   intent(in)    :: m, n, lena, Hlen
-    integer(ip),   intent(out)   :: ibest, jbest, mbest
     integer(ip),   intent(in)    :: indc(lena), indr(lena), &
                                     lenc(n)   , lenr(m)   , locc(n), Hj(Hlen)
     real(rp),      intent(in)    :: aijtol
     real(rp),      intent(in)    :: a(lena)   , Ha(Hlen)
+    integer(ip),   intent(out)   :: ibest, jbest, mbest
 
     !------------------------------------------------------------------
     ! lu1mCP  uses a Markowitz criterion to select a pivot element
@@ -2666,7 +2765,7 @@ Rowi:     do lr = lr1, lr2
     integer(ip)            :: i, j, kheap, lc, lc1, lc2, len1, lenj, &
                               maxcol, merit, ncol, nz1
     real(rp)               :: abest, aij, amax, cmax, lbest
-    real(rp),    parameter :: zero = 0.0,  one = 1.0, gamma = 2.0
+    real(rp),    parameter :: gamma = 2.0
 
     ! gamma  is "gamma" in the tie-breaking rule TB4 in the LUSOL paper.
 
@@ -2778,9 +2877,10 @@ Colj:  do lc = lc1, lc2
                      a    , indc  , q    , locc , iqloc )
 
     integer(ip),   intent(in)    :: m, n, lena, maxmn, maxcol
-    integer(ip),   intent(out)   :: ibest, jbest, mbest
     real(rp),      intent(in)    :: Ltol, a(lena)
     integer(ip),   intent(in)    :: indc(lena), q(n), iqloc(m), locc(n)
+
+    integer(ip),   intent(out)   :: ibest, jbest, mbest
 
     !------------------------------------------------------------------
     ! lu1mSP  is intended for symmetric matrices that are either
@@ -2804,7 +2904,6 @@ Colj:  do lc = lc1, lc2
     integer(ip)            :: i, j, kbest, lc, lc1, lc2, &
                               lq, lq1, lq2, merit, ncol, nz, nz1
     real(rp)               :: abest, aij, amax, atolj
-    real(rp),    parameter :: zero = 0.0
 
 
     !------------------------------------------------------------------
@@ -2913,11 +3012,11 @@ Colj:     do lc = lc1, lc2
 
     integer(ip),   intent(in)    :: m, melim, ncold, nspare, &
                                     lpivc1, lpivc2, lpivr1, lpivr2
-    integer(ip),   intent(inout) :: lrow
-    integer(ip),   intent(out)   :: ilast
-    integer(ip),   intent(inout) :: indc(*), indr(*), lenc(*), lenr(*)
     integer(ip),   intent(in)    :: locc(*), ifill(melim), jfill(ncold)
+    integer(ip),   intent(inout) :: lrow
+    integer(ip),   intent(inout) :: indc(*), indr(*), lenc(*), lenr(*)
     integer(ip),   intent(inout) :: locr(*)
+    integer(ip),   intent(out)   :: ilast
 
     !------------------------------------------------------------------
     ! lu1pen deals with pending fill-in in the row file.
@@ -2934,9 +3033,12 @@ Colj:     do lc = lc1, lc2
     !
     ! 10 Jan 2010: First f90 version.
     ! 12 Dec 2011: Declare intent.
+    ! 14 Jul 2015: (William Gandler) Fix deceptive loop 
+    !              do l = lrow + 1, lrow + nspare
+    !                 lrow    = l
     !------------------------------------------------------------------
 
-    integer(ip)       :: i, j, l, last, lc, lc1, lc2, ll, lr, lr1, lr2, lu
+    integer(ip)       :: i, j, l, l1, l2, last, lc, lc1, lc2, ll, lr, lr1, lr2, lu
 
     ll     = 0
 
@@ -2947,11 +3049,16 @@ Colj:     do lc = lc1, lc2
        ! Another row has pending fill.
        ! First, add some spare space at the end
        ! of the current last row.
+       ! 14 Jul 2015: (William Gandler) Fix deceptive loop
+       !              (same as fix in previous comment)
 
-       do l = lrow + 1, lrow + nspare
-          lrow    = l
+       l1     = lrow + 1
+       l2     = lrow + nspare
+       do l = l1, l2
+       !  lrow    = l
           indr(l) = 0
        end do
+       lrow   = l2
 
        ! Now move row i to the end of the row file.
 
@@ -3016,45 +3123,41 @@ Colj:     do lc = lc1, lc2
     !
     ! 10 Jan 2010: First f90 version.
     ! 12 Dec 2011: Declare intent.
+    ! 13 Dec 2015: BUG!  We can't set a(lc1) = zero for an empty col.
+    !              We need to fix the heap routines another way.
+    !              Here, fixed the case lenc(j) = 0.
     !------------------------------------------------------------------
 
-    integer(ip)            :: i, j, k, l, lc, lc1, lc2, lenj
+    integer(ip)            :: i, j, k, l, lc, lc1, lc2
     real(rp)               :: amax
-    real(rp),    parameter :: zero = 0.0
-
 
     do k = k1, k2
        j      = q(k)
        lc1    = locc(j)
-       lenj   = lenc(j)
 
-       if (lenj == 0) then
-          a(lc1) = zero
-       else
+       ! The next 10 lines are equivalent to
+       ! l      = idamax( lenc(j), a(lc1), 1 )  +  lc1 - 1
+       ! >>>>>>>>
+       lc2    = lc1 + lenc(j) - 1
+       amax   = zero
+       l      = lc1
 
-          ! The next 10 lines are equivalent to
-          ! l      = idamax( lenc(j), a(lc1), 1 )  +  lc1 - 1
-          ! >>>>>>>>
-          lc2    = lc1 + lenc(j) - 1
-          amax   = abs( a(lc1) )
-          l      = lc1
-
-          do lc = lc1+1, lc2
-             if (amax < abs( a(lc) )) then
-                amax   =  abs( a(lc) )
-                l      =  lc
-             end if
-          end do
-          ! >>>>>>>>
-
-          if (l > lc1) then
-             amax      = a(l)
-             a(l)      = a(lc1)
-             a(lc1)    = amax
-             i         = indc(l)
-             indc(l)   = indc(lc1)
-             indc(lc1) = i
+       do lc = lc1, lc2
+          if (amax < abs( a(lc) )) then
+             amax   =  abs( a(lc) )
+             l      =  lc
           end if
+       end do
+       ! >>>>>>>>
+
+       ! Note that empty columns do nothing (l = lc1).
+       if (l > lc1) then
+          amax      = a(l)
+          a(l)      = a(lc1)
+          a(lc1)    = amax
+          i         = indc(l)
+          indc(l)   = indc(lc1)
+          indc(lc1) = i
        end if
     end do
 
@@ -3062,16 +3165,17 @@ Colj:     do lc = lc1, lc2
 
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine lu1mxr( mark, k1, k2, m, n, lena,              &
+  subroutine lu1mxr( mark, k1, k2, m, n, lena, inform,      &
                      a, indc, lenc, locc, indr, lenr, locr, &
                      p, markc, markr, Amaxr )
 
-    implicit       none
     integer(ip),   intent(in)    :: mark, k1, k2, m, n, lena
+    integer(ip),   intent(out)   :: inform
     integer(ip),   intent(in)    :: indc(lena), lenc(n), locc(n),       &
                                     indr(lena), lenr(m), locr(m), p(k2)
-    integer(ip),   intent(inout) :: markc(n), markr(m)
     real(rp),      intent(in)    :: a(lena)
+
+    integer(ip),   intent(inout) :: markc(n), markr(m)
     real(rp),      intent(inout) :: Amaxr(m)
 
     !------------------------------------------------------------------
@@ -3098,11 +3202,13 @@ Colj:     do lc = lc1, lc2
     !              markc(:), markr(:) are marked (= mark) in some places.
     !              For next call with new mark,
     !              all of markc, markr will initially appear unmarked.
+    ! 28 Sep 2015: inform is now an output to mean i is invalid.
     !------------------------------------------------------------------
 
     integer(ip)            :: cols(n)
     integer(ip)            :: i, j, k, lc, lc1, lc2, lr, lr1, lr2, ncol
-    real(rp),    parameter :: zero = 0.0
+
+    inform = 0
 
     if (mark == 0) then    ! First call: Find Amaxr(1:m) for original A.
        markr(1:m) = 0
@@ -3142,6 +3248,12 @@ Colj:     do lc = lc1, lc2
           lc2   = lc1 + lenc(j) - 1
           do lc = lc1, lc2
              i  = indc(lc)
+             ! 25 Sep 2015: Check for invalid i that would cause a crash.
+             ! if (i > m) then
+             !    write(*,*) 'lu1mxr fatal error: i =', i
+             !    inform = 10
+             !    return
+             ! end if
              if (markr(i) == mark) then
                  Amaxr(i)  = max( Amaxr(i), abs(a(lc)) )
              end if
@@ -3158,10 +3270,12 @@ Colj:     do lc = lc1, lc2
                      Amax, numnz, lerr, inform )
 
     integer(ip),   intent(in)    :: m, n, nelem, lena
-    integer(ip),   intent(out)   :: lerr, inform
     real(rp),      intent(in)    :: small
+
     real(rp),      intent(inout) :: a(lena)
     integer(ip),   intent(inout) :: indc(lena), indr(lena)
+
+    integer(ip),   intent(out)   :: lerr, inform
     integer(ip),   intent(out)   :: lenc(n), lenr(m)
 
     !------------------------------------------------------------------
@@ -3190,7 +3304,7 @@ Colj:     do lc = lc1, lc2
 
     integer(ip)           :: i, j, l, numnz
     real(rp)              :: Amax
-    real(rp),   parameter :: zero = 0.0
+
 
     lenr(1:m) = 0
     lenc(1:n) = 0
@@ -3235,9 +3349,11 @@ Colj:     do lc = lc1, lc2
 
     integer(ip),   intent(in)    :: n, numa, lena
     integer(ip),   intent(in)    :: lenc(n)
+
     integer(ip),   intent(inout) :: inum(lena), jnum(lena)
-    integer(ip),   intent(out)   :: locc(n)
     real(rp),      intent(inout) :: a(lena)
+
+    integer(ip),   intent(out)   :: locc(n)
 
     !------------------------------------------------------------------
     ! lu1or2  sorts a list of matrix elements  a(i,j)  into column
@@ -3330,8 +3446,9 @@ Colj:     do lc = lc1, lc2
   subroutine lu1or3( m, n, lena, indc, lenc, locc, iw, lerr, inform )
 
     integer(ip),   intent(in)    :: m, n, lena
-    integer(ip),   intent(out)   :: lerr, inform
     integer(ip),   intent(in)    :: indc(lena), lenc(n), locc(n)
+
+    integer(ip),   intent(out)   :: lerr, inform
     integer(ip),   intent(out)   :: iw(m)
 
     !------------------------------------------------------------------
@@ -3378,8 +3495,8 @@ Colj:     do lc = lc1, lc2
   subroutine lu1or4( m, n, nelem, lena, indc, indr, lenc, lenr, locc, locr )
 
     integer(ip),   intent(in)    :: m, n, nelem, lena
-    integer(ip),   intent(in)    :: indc(lena), lenc(n), locc(n)
-    integer(ip),   intent(out)   :: indr(lena), lenr(m), locr(m)
+    integer(ip),   intent(in)    :: indc(lena), lenc(n), locc(n), lenr(m)
+    integer(ip),   intent(out)   :: indr(lena), locr(m)
 
     !------------------------------------------------------------------
     ! lu1or4     constructs a row list  indr, locr
@@ -3512,9 +3629,9 @@ Colj:     do lc = lc1, lc2
   subroutine lu1pq2( nzpiv, nzchng, indr, lenold, lennew, iqloc, q, iqinv )
 
     integer(ip),   intent(in)    :: nzpiv
-    integer(ip),   intent(out)   :: nzchng
     integer(ip),   intent(in)    :: lenold(nzpiv), lennew(*)
     integer(ip),   intent(inout) :: indr(nzpiv), iqloc(*), q(*), iqinv(*)
+    integer(ip),   intent(out)   :: nzchng
 
     !===============================================================
     ! lu1pq2 frees the space occupied by the pivot row,
@@ -3531,7 +3648,7 @@ Colj:     do lc = lc1, lc2
     ! 12 Dec 2011: Declare intent and local variables.
     !===============================================================
 
-    integer(ip)         j, jnew, l, lnew, lr, next, nz, nznew
+    integer(ip) :: j, jnew, l, lnew, lr, next, nz, nznew
 
     nzchng = 0
 
@@ -3547,10 +3664,7 @@ Colj:     do lc = lc1, lc2
 
           ! l above is the position of column j in q  (so j = q(l)).
 
-          if (nz < nznew) then
-
-             ! Column  j  has to move towards the end of  q.
-
+          if (nz < nznew) then   ! Column j has to move toward the end of q.
 110          next        = nz + 1
              lnew        = iqloc(next) - 1
              if (lnew /= l) then
@@ -3562,10 +3676,8 @@ Colj:     do lc = lc1, lc2
              iqloc(next) = lnew
              nz          = next
              if (nz < nznew) go to 110
-          else
 
-             ! Column  j  has to move towards the front of  q.
-
+          else   ! Column j has to move toward the front of q.
 120          lnew        = iqloc(nz)
              if (lnew /= l) then
                 jnew        = q(lnew)
@@ -3629,11 +3741,13 @@ Colj:     do lc = lc1, lc2
 
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine lu1rec( n, reals, luparm, ltop, lena, a, ind, lenc, locc )
+  subroutine lu1rec( n, reals, luparm, ltop, ilast, &
+                     lena, a, ind, lenc, locc )
 
     logical,       intent(in)    :: reals
     integer(ip),   intent(in)    :: n, lena
-    integer(ip),   intent(out)   :: ltop
+    integer(ip),   intent(inout) :: ltop
+    integer(ip),   intent(out)   :: ilast
     integer(ip),   intent(inout) :: luparm(30), ind(lena), lenc(n), locc(n)
     real(rp),      intent(inout) :: a(lena)
 
@@ -3664,14 +3778,15 @@ Colj:     do lc = lc1, lc2
     !
     ! On exit:
     ! ltop         is the length of useful entries in ind(*), a(*).
-    ! ind(ltop+1)  is "i" such that len(i), loc(i) belong to the last
-    !              item in ind(*), a(*).
+    ! ind(ltop+1)  is "i=ilast" such that len(i), loc(i) belong to the
+    !              last item in ind(*), a(*).
     !
     ! 10 Jan 2010: First f90 version.
     ! 12 Dec 2011: Declare intent and local variables.
+    ! 20 Dec 2015: ilast is output instead of ind(ltop+1).
     !------------------------------------------------------------------
 
-    integer(ip)        :: i, ilast, k, klast, l, leni, lprint, nempty, nout
+    integer(ip)        :: i, k, klast, l, leni, lprint, nempty, nout
 
     nempty = 0
 
@@ -3701,6 +3816,7 @@ Colj:     do lc = lc1, lc2
           i       = - (i + n)
           ilast   = i
           k       = k + 1
+
           ind(k)  = lenc(i)
           if (reals) a(k) = a(l)
           locc(i) = klast + 1
@@ -3727,10 +3843,10 @@ Colj:     do lc = lc1, lc2
     if (lprint >= 50) write(nout, 1000) ltop, k, reals, nempty
     luparm(26) = luparm(26) + 1  ! ncp
 
-    ! Return ilast in ind(ltop + 1).
+    ! 20 Dec 2015: Return ilast itself instead of ind(ltop + 1).
 
     ltop        = k
-    ind(ltop+1) = ilast
+  ! ind(ltop+1) = ilast
     return
 
 1000 format(' lu1rec.  File compressed from', i10, '   to', i10, l3, '  nempty =', i8)
@@ -3739,10 +3855,11 @@ Colj:     do lc = lc1, lc2
 
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine lu1slk( m, n, lena, q, iqloc, a, locc, w )
+  subroutine lu1slk( m, n, lena, q, iqloc, a, indc, locc, nslack, w )
 
     integer(ip),   intent(in)    :: m, n, lena
-    integer(ip),   intent(in)    :: q(n), iqloc(m), locc(n)
+    integer(ip),   intent(in)    :: q(n), iqloc(m), indc(lena), locc(n)
+    integer(ip),   intent(out)   :: nslack
     real(rp),      intent(in)    :: a(lena)
     real(rp),      intent(out)   :: w(n)
 
@@ -3755,11 +3872,19 @@ Colj:     do lc = lc1, lc2
     !
     ! 10 Jan 2010: First f90 version.
     ! 12 Dec 2011: Declare intent and local variables.
+    ! 12 Dec 2015: Always call lu1slk from lu1fac to obtain nslack.
+    !              Need indc(*) and markr(*) to count 1 slack per row.
     !------------------------------------------------------------------
 
-    integer(ip)   :: j, lc1, lq, lq1, lq2
+    integer(ip)   :: markr(m)
+    integer(ip)   :: i, j, lc1, lq, lq1, lq2
 
-    w(1:n) = 0.0_rp
+    nslack     = 0
+    markr(1:m) = 0
+    w(1:n)     = zero
+
+    ! Check all columns of length 1.
+
     lq1    = iqloc(1)
     lq2    = n
     if (m > 1) lq2 = iqloc(2) - 1
@@ -3767,8 +3892,13 @@ Colj:     do lc = lc1, lc2
     do lq = lq1, lq2
        j      = q(lq)
        lc1    = locc(j)
-       if (abs( a(lc1) ) == 1.0_rp) then
-          w(j) = 1.0_rp
+       if (abs( a(lc1) ) == one) then
+          i      = indc(lc1)
+          if (markr(i) == 0) then
+             nslack   = nslack + 1
+             markr(i) = i
+             w(j)     = one
+          end if
        end if
     end do
 
@@ -3786,14 +3916,16 @@ Colj:     do lc = lc1, lc2
     logical,       intent(in)    :: TPP, keepLU
     integer(ip),   intent(in)    :: m, n, lena, lenD, lu1,   &
                                     mleft, nleft, nrank, nrowu
-    integer(ip),   intent(inout) :: lenL, lenU
-    integer(ip),   intent(out)   :: nsing  ! not used outside
     integer(ip),   intent(in)    :: locc(n)
+    real(rp),      intent(in)    :: small
+
+    integer(ip),   intent(inout) :: lenL, lenU
     integer(ip),   intent(inout) :: indc(lena), indr(lena), p(m), q(n), &
                                     lenc(n)   , lenr(m)
-    integer(ip),   intent(out)   :: ipvt(m), ipinv(m)   ! workspace
-    real(rp),      intent(in)    :: small
     real(rp),      intent(inout) :: a(lena)
+
+    integer(ip),   intent(out)   :: ipvt(m), ipinv(m)   ! workspace
+    integer(ip),   intent(out)   :: nsing  ! not used outside
     real(rp),      intent(out)   :: d(lenD)
 
     !------------------------------------------------------------------
@@ -3813,7 +3945,6 @@ Colj:     do lc = lc1, lc2
                            la, lc, lc1, lc2, ld, ldbase, ldiagU,     &
                            lkk, lkn, ll, lq, lu, nrowd, ncold
     real(rp)            :: ai, aj
-    real(rp), parameter :: zero = 0.0
 
     !------------------------------------------------------------------
     ! If lu1pq3 moved any empty rows, reset ipinv = inverse of p.
@@ -3944,11 +4075,13 @@ Colj:     do lc = lc1, lc2
   subroutine lu1DPP( a, lda, m, n, small, nsing, ipvt, q )
 
     integer(ip),   intent(in)    :: lda, m, n
+    real(rp),      intent(in)    :: small
+
+    integer(ip),   intent(inout) :: q(n)
+    real(rp),      intent(inout) :: a(lda,n)
+
     integer(ip),   intent(out)   :: nsing   ! not used outside
     integer(ip),   intent(out)   :: ipvt(m)
-    integer(ip),   intent(inout) :: q(n)
-    real(rp),      intent(in)    :: small
-    real(rp),      intent(inout) :: a(lda,n)
 
     !------------------------------------------------------------------
     ! lu1DPP factors a dense m x n matrix A by Gaussian elimination,
@@ -4007,10 +4140,9 @@ Colj:     do lc = lc1, lc2
     ! q       A vector to which column interchanges are applied.
     !------------------------------------------------------------------
 
-  ! integer(ip), external  :: idamax
     integer(ip)            :: i, j, k, kp1, l, last, lencol, rankU
     real(rp)               :: t
-    real(rp),    parameter :: zero = 0.0,  one = 1.0
+
 
     rankU  = 0
     k      = 1
@@ -4101,11 +4233,13 @@ Colj:     do lc = lc1, lc2
   subroutine lu1DCP( a, lda, m, n, small, nsing, ipvt, q )
 
     integer(ip),   intent(in)    :: lda, m, n
+    real(rp),      intent(in)    :: small
+
+    integer(ip),   intent(inout) :: q(n)
+    real(rp),      intent(inout) :: a(lda,n)
+
     integer(ip),   intent(out)   :: nsing   ! not used outside
     integer(ip),   intent(out)   :: ipvt(m)
-    integer(ip),   intent(inout) :: q(n)
-    real(rp),      intent(in)    :: small
-    real(rp),      intent(inout) :: a(lda,n)
 
     !------------------------------------------------------------------
     ! lu1DCP factors a dense m x n matrix A by Gaussian elimination,
@@ -4130,6 +4264,8 @@ Colj:     do lc = lc1, lc2
     ! 10 Jan 2010: First f90 version.
     ! 12 Dec 2011: Declare intent and local variables.
     ! 03 Feb 2012: a(kp1:m,j) = t*a(kp1:m,k) + a(kp1:m,j)  needs the last :m
+    ! 21 Dec 2015: t = 0 caused divide by zero.
+    !              Add test to exit if aijmax <= small.
     !------------------------------------------------------------------
     !
     ! On entry:
@@ -4158,11 +4294,9 @@ Colj:     do lc = lc1, lc2
     ! q       A vector to which column interchanges are applied.
     !------------------------------------------------------------------
 
-  ! integer(ip), external  :: idamax
     real(rp)               :: aijmax, ajmax, t
     integer(ip)            :: i, imax, j, jlast, jmax, jnew, &
                               k, kp1, l, last, lencol, rankU
-    real(rp),    parameter :: zero = 0.0,  one = 1.0
 
     rankU  = 0
     lencol = m + 1
@@ -4225,6 +4359,11 @@ Colj:     do lc = lc1, lc2
 
 200    ipvt(k) = imax
 
+       ! 21 Dec 2015: Exit if aijmax is essentially zero.
+
+       if (aijmax <= small) go to 500
+       rankU  = rankU + 1
+
        if (jmax /= k) then   ! Do column interchange (k and jmax).
           jnew    = q(jmax)
           q(jmax) = q(k)
@@ -4280,8 +4419,7 @@ Colj:     do lc = lc1, lc2
   end subroutine lu1DCP
 
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  !
-  ! Original file: lusol2.f
+  ! File lusol2.f90
   !
   ! Hbuild   Hchange  Hdelete  Hdown    Hinsert  Hup
   !
@@ -4293,8 +4431,8 @@ Colj:     do lc = lc1, lc2
   ! 07 May 2002: Safeguard input parameters k, N, Nk.
   !              We don't want them to be output!
   ! 19 Dec 2004: Hdelete: Nin is new input parameter for length of Hj, Ha.
-  ! 19 Dec 2004: Current version of lusol2.f.
   ! 12 Dec 2011: First f90 version.
+  ! 19 Dec 2015: Current version of lusol2.f90.
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   !
   ! For LUSOL, the heap structure involves three arrays of length N.
@@ -4320,9 +4458,9 @@ Colj:     do lc = lc1, lc2
   subroutine Hbuild( Ha, Hj, Hk, N, Nk, hops )
 
     integer(ip),   intent(in)    :: N, Nk
-    integer(ip),   intent(out)   :: hops
     integer(ip),   intent(inout) :: Hj(N), Hk(Nk)
-    real(rp),      intent(out)   :: Ha(N)
+    integer(ip),   intent(out)   :: hops
+    real(rp),      intent(inout) :: Ha(N)
 
     !==================================================================
     ! Hbuild initializes the heap by inserting each element of Ha.
@@ -4357,10 +4495,10 @@ Colj:     do lc = lc1, lc2
   subroutine Hchange( Ha, Hj, Hk, N, Nk, k, v, jv, hops )
 
     integer(ip),   intent(in)    :: N, Nk, k, jv
-    integer(ip),   intent(out)   :: hops
-    integer(ip),   intent(inout) :: Hj(N), Hk(Nk)
     real(rp),      intent(in)    :: v
+    integer(ip),   intent(inout) :: Hj(N), Hk(Nk)
     real(rp),      intent(inout) :: Ha(N)
+    integer(ip),   intent(out)   :: hops
 
     !==================================================================
     ! Hchange changes Ha(k) to v in heap of length N.
@@ -4395,9 +4533,9 @@ Colj:     do lc = lc1, lc2
 
     integer(ip),   intent(in)    :: Nin, Nk, k
     integer(ip),   intent(inout) :: N
-    integer(ip),   intent(out)   :: hops
     integer(ip),   intent(inout) :: Hj(Nin), Hk(Nk)
     real(rp),      intent(inout) :: Ha(Nin)
+    integer(ip),   intent(out)   :: hops
 
     !==================================================================
     ! Hdelete deletes Ha(k) from heap of length N.
@@ -4431,15 +4569,15 @@ Colj:     do lc = lc1, lc2
   subroutine Hdown ( Ha, Hj, Hk, N, Nk, kk, hops )
 
     integer(ip),   intent(in)    :: N, Nk, kk
-    integer(ip),   intent(out)   :: hops
     integer(ip),   intent(inout) :: Hj(N), Hk(Nk)
     real(rp),      intent(inout) :: Ha(N)
+    integer(ip),   intent(out)   :: hops
 
     !==================================================================
     ! Hdown  updates heap by moving down tree from node k.
     !
     ! 01 May 2002: Need Nk for length of Hk.
-    ! 05 May 2002: Change input paramter k to kk to stop k being output.
+    ! 05 May 2002: Change input parameter k to kk to stop k being output.
     ! 05 May 2002: Current version of Hdown.
     ! 12 Dec 2011: First f90 version.
     !==================================================================
@@ -4479,11 +4617,11 @@ Colj:     do lc = lc1, lc2
   subroutine Hinsert( Ha, Hj, Hk, N, Nk, v, jv, hops )
 
     integer(ip),   intent(in)    :: Nk, jv
-    integer(ip),   intent(inout) :: N
-    integer(ip),   intent(out)   :: hops
-    integer(ip),   intent(inout) :: Hj(N), Hk(Nk)
     real(rp),      intent(in)    :: v
+    integer(ip),   intent(inout) :: N
+    integer(ip),   intent(inout) :: Hj(N), Hk(Nk)
     real(rp),      intent(inout) :: Ha(N)
+    integer(ip),   intent(out)   :: hops
 
     !==================================================================
     ! Hinsert inserts (v,jv) into heap of length N-1
@@ -4514,9 +4652,9 @@ Colj:     do lc = lc1, lc2
   subroutine Hup   ( Ha, Hj, Hk, N, Nk, kk, hops )
 
     integer(ip),   intent(in)    :: N, Nk, kk
-    integer(ip),   intent(out)   :: hops
     integer(ip),   intent(inout) :: Hj(N), Hk(Nk)
     real(rp),      intent(inout) :: Ha(N)
+    integer(ip),   intent(out)   :: hops
 
     !==================================================================
     ! Hup updates heap by moving up tree from node k.
@@ -4554,7 +4692,7 @@ Colj:     do lc = lc1, lc2
   end subroutine Hup
 
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  ! Original file:  lusol6a.f
+  ! File lusol6a.f90
   !
   ! lu6sol   lu6L     lu6Lt     lu6U     Lu6Ut   lu6LD    lu6chk
   !
@@ -4565,6 +4703,7 @@ Colj:     do lc = lc1, lc2
   !              by comparing all diagonals to DUmax.
   ! 27 Jun 2004: lu6chk.  Allow write only if nout > 0 .
   ! 13 Dec 2011: First f90 version.
+  ! 20 Jan 2016: Current version of lusol6a.f90.
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   subroutine lu6sol( mode, m, n, v, w,       &
@@ -4574,12 +4713,14 @@ Colj:     do lc = lc1, lc2
                      inform )
 
     integer(ip),   intent(in)    :: mode, m, n, lena
-    integer(ip),   intent(inout) :: luparm(30)
-    integer(ip),   intent(out)   :: inform
     integer(ip),   intent(in)    :: indc(lena), indr(lena), p(m), q(n),   &
                                     lenc(n), lenr(m), locc(n), locr(m)
     real(rp),      intent(in)    :: a(lena)
+
+    integer(ip),   intent(inout) :: luparm(30)
     real(rp),      intent(inout) :: parmlu(30), v(m), w(n)
+
+    integer(ip),   intent(out)   :: inform
 
     !-----------------------------------------------------------------------
     ! lu6sol  uses the factorization  A = L U  as follows:
@@ -4683,11 +4824,13 @@ Colj:     do lc = lc1, lc2
                      lena, luparm, parmlu, a, indc, indr, lenc )
 
     integer(ip),   intent(in)    :: m, n, lena
-    integer(ip),   intent(inout) :: luparm(30)
-    integer(ip),   intent(out)   :: inform
     integer(ip),   intent(in)    :: indc(lena), indr(lena), lenc(n)
     real(rp),      intent(in)    :: a(lena)
+
+    integer(ip),   intent(inout) :: luparm(30)
     real(rp),      intent(inout) :: parmlu(30), v(m)
+
+    integer(ip),   intent(out)   :: inform
 
     !------------------------------------------------------------------
     ! lu6L   solves   L v = v(input).
@@ -4750,11 +4893,11 @@ Colj:     do lc = lc1, lc2
                      lena, luparm, parmlu, a, indc, indr, lenc )
 
     integer(ip),   intent(in)    :: m, n, lena
-    integer(ip),   intent(inout) :: luparm(30)
-    integer(ip),   intent(out)   :: inform
     integer(ip),   intent(in)    :: indc(lena), indr(lena), lenc(n)
     real(rp),      intent(in)    :: a(lena)
+    integer(ip),   intent(inout) :: luparm(30)
     real(rp),      intent(inout) :: parmlu(30), v(m)
+    integer(ip),   intent(out)   :: inform
 
     !------------------------------------------------------------------
     ! lu6Lt  solves   L'v = v(input).
@@ -4764,9 +4907,9 @@ Colj:     do lc = lc1, lc2
     ! 13 Dec 2011: First f90 version.
     !------------------------------------------------------------------
 
-    integer(ip)            :: i, ipiv, j, k, l, l1, l2, len, lenL, lenL0, numL0
-    real(rp)               :: small, sum
-    real(rp),    parameter :: zero = 0.0
+    integer(ip) :: i, ipiv, j, k, l, l1, l2, len, lenL, lenL0, numL0
+    real(rp)    :: small, sum
+
 
     numL0  = luparm(20)
     lenL0  = luparm(21)
@@ -4813,12 +4956,14 @@ Colj:     do lc = lc1, lc2
                      lena, luparm, parmlu, a, indr, p, q, lenr, locr )
 
     integer(ip),   intent(in)    :: m, n, lena
-    integer(ip),   intent(inout) :: luparm(30)
-    integer(ip),   intent(out)   :: inform
     integer(ip),   intent(in)    :: indr(lena), p(m), q(n), lenr(m), locr(m)
     real(rp),      intent(in)    :: a(lena)
     real(rp),      intent(in)    :: v(m)
+
+    integer(ip),   intent(inout) :: luparm(30)
     real(rp),      intent(inout) :: parmlu(30)
+
+    integer(ip),   intent(out)   :: inform
     real(rp),      intent(out)   :: w(n)
 
     !------------------------------------------------------------------
@@ -4831,7 +4976,7 @@ Colj:     do lc = lc1, lc2
 
     integer(ip)            :: i, j, k, klast, l, l1, l2, l3, nrank, nrank1
     real(rp)               :: resid, small, t
-    real(rp),    parameter :: zero = 0.0
+
 
     nrank  = luparm(16)
     small  = parmlu(3)
@@ -4895,11 +5040,11 @@ Colj:     do lc = lc1, lc2
                      lena, luparm, parmlu, a, indr, p, q, lenr, locr )
 
     integer(ip),   intent(in)    :: m, n, lena
-    integer(ip),   intent(inout) :: luparm(30)
-    integer(ip),   intent(out)   :: inform
     integer(ip),   intent(in)    :: indr(lena), p(m), q(n), lenr(m), locr(m)
     real(rp),      intent(in)    :: a(lena)
+    integer(ip),   intent(inout) :: luparm(30)
     real(rp),      intent(inout) :: parmlu(30), w(n)
+    integer(ip),   intent(out)   :: inform
     real(rp),      intent(out)   :: v(m)
 
     !------------------------------------------------------------------
@@ -4912,7 +5057,6 @@ Colj:     do lc = lc1, lc2
 
     integer(ip)            :: i, j, k, l, l1, l2, nrank, nrank1
     real(rp)               :: resid, small, t
-    real(rp),    parameter :: zero = 0.0
 
 
     nrank  = luparm(16)
@@ -4972,11 +5116,11 @@ Colj:     do lc = lc1, lc2
                      lena, luparm, parmlu, a, indc, indr, lenc, locr )
 
     integer(ip),   intent(in)    :: mode, m, n, lena
-    integer(ip),   intent(inout) :: luparm(30)
-    integer(ip),   intent(out)   :: inform
     integer(ip),   intent(in)    :: indc(lena), indr(lena), lenc(n), locr(m)
     real(rp),      intent(in)    :: a(lena)
+    integer(ip),   intent(inout) :: luparm(30)
     real(rp),      intent(inout) :: parmlu(30), v(m)
+    integer(ip),   intent(out)   :: inform
 
     !-------------------------------------------------------------------
     ! lu6LD  assumes lu1fac has computed factors A = LU of a
@@ -5028,7 +5172,7 @@ Colj:     do lc = lc1, lc2
           ! Find diag = U(ipiv,ipiv) and divide by diag or |diag|.
 
           l    = locr(ipiv)
-          diag = A(l)
+          diag = a(l)
           if (mode == 2) diag = abs(diag)
           v(ipiv) = vpiv/diag
        end if
@@ -5038,17 +5182,19 @@ Colj:     do lc = lc1, lc2
 
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine lu6chk( mode, m, n, w, lena, luparm, parmlu, &
+  subroutine lu6chk( mode, m, n, nslack, w, lena, luparm, parmlu, &
                      a, indc, indr, p, q, lenc, lenr, locc, locr, inform )
 
-    integer(ip),   intent(in)    :: mode, m, n, lena
-    integer(ip),   intent(inout) :: inform
-    integer(ip),   intent(inout) :: luparm(30)
+    integer(ip),   intent(in)    :: mode, m, n, nslack, lena
     integer(ip),   intent(in)    :: indc(lena), indr(lena), p(m), q(n), &
                                     lenc(n), lenr(m), locc(n), locr(m)
     real(rp),      intent(in)    :: a(lena)
+
+    integer(ip),   intent(inout) :: inform
+    integer(ip),   intent(inout) :: luparm(30)
     real(rp),      intent(inout) :: parmlu(30)
-    real(rp),      intent(out)   :: w(n)
+
+    real(rp),      intent(inout) :: w(n)
 
     !-----------------------------------------------------------------
     ! lu6chk  looks at the LU factorization  A = L*U.
@@ -5113,6 +5259,7 @@ Colj:     do lc = lc1, lc2
     !              all diagonals to DUmax.
     ! 27 Jun 2004: (PEG) Allow write only if nout > 0 .
     ! 13 Dec 2011: First f90 version.
+    ! 12 Dec 2015: nslack ensures slacks are kept with w(j) > 0.
     !------------------------------------------------------------------
 
     character(1)        :: mnkey
@@ -5120,7 +5267,6 @@ Colj:     do lc = lc1, lc2
     integer(ip)         :: i, j, jsing, jumin, k, l, l1, l2, ldiagU, lenL, &
                            lprint, ndefic, nout, nrank, nsing
     real(rp)            :: aij, diag, DUmax, DUmin, Lmax, Umax, Utol1, Utol2
-    real(rp), parameter :: zero = 0.0
 
 
     nout   = luparm(1)
@@ -5141,8 +5287,8 @@ Colj:     do lc = lc1, lc2
     DUmax  = zero
     DUmin  = 1.0d+30
 
-    w(1:n) = zero
-
+    ! w(j) is already set by lu1slk.
+    ! w(1:n) = zero
 
     if (keepLU) then
        !--------------------------------------------------------------
@@ -5155,7 +5301,7 @@ Colj:     do lc = lc1, lc2
        !--------------------------------------------------------------
        ! Find Umax and set w(j) = maximum element in j-th column of U.
        !--------------------------------------------------------------
-       do k = 1, nrank
+       do k = nslack + 1, nrank   ! 12 Dec 2015: Allow for nslack.
           i     = p(k)
           l1    = locr(i)
           l2    = l1 + lenr(i) - 1
@@ -5174,7 +5320,7 @@ Colj:     do lc = lc1, lc2
        !--------------------------------------------------------------
        ! Find DUmax and DUmin, the extreme diagonals of U.
        !--------------------------------------------------------------
-       do k = 1, nrank
+       do k = nslack + 1, nrank   ! 12 Dec 2015: Allow for nslack.
           j      = q(k)
           i      = p(k)
           l1     = locr(i)
@@ -5194,7 +5340,7 @@ Colj:     do lc = lc1, lc2
        !--------------------------------------------------------------
        ldiagU = lena - n
 
-       do k = 1, nrank
+       do k = nslack + 1, nrank   ! 12 Dec 2015: Allow for nslack.
           j      = q(k)
         ! diag   = abs( a(ldiagU + k) ) ! 06 May 2002: Diags
           diag   = abs( a(ldiagU + j) ) ! are in natural order
@@ -5216,13 +5362,18 @@ Colj:     do lc = lc1, lc2
     ! 23 Apr 2004: TRP ensures that diags are NOT small relative to
     !              other elements in their own column.
     !              Much better, we can compare all diags to DUmax.
+    ! 13 Nov 2015: This causes slacks to replace slacks when DUmax
+    !              is big.  It seems better to leave Utol1 alone.
+    ! 12 Dec 2015: Allow for nslack.
+    !              DUmax now excludes slack rows, so we can
+    !              reset Utol1 again for TRP.
     !--------------------------------------------------------------
     if (mode == 1  .and.  TRP) then
        Utol1 = max( Utol1, Utol2*DUmax )
     end if
 
     if (keepLU) then
-       do k = 1, n
+       do k = nslack + 1, n   ! 12 Dec 2015: Allow for nslack.
           j     = q(k)
           if (k > nrank) then
              diag   = zero
@@ -5241,7 +5392,7 @@ Colj:     do lc = lc1, lc2
 
     else ! keepLU = 0
 
-       do k = 1, n
+       do k = nslack + 1, n   ! 12 Dec 2015: Allow for nslack.
           j      = q(k)
           diag   = w(j)
 
@@ -5252,7 +5403,6 @@ Colj:     do lc = lc1, lc2
           end if
        end do
     end if
-
 
     !-----------------------------------------------------------------
     ! Set output parameters.
@@ -5289,15 +5439,15 @@ Colj:     do lc = lc1, lc2
   end subroutine lu6chk
 
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  ! Original file: lusol7a.f
+  ! File lusol7a.f90
   !
   ! lu7add   lu7cyc   lu7elm   lu7for   lu7rnk   lu7zap
   ! Utilities for LUSOL's update routines.
   ! lu7for is the most important -- the forward sweep.
   !
   ! 01 May 2002: Derived from LUSOL's original lu7a.f file.
-  ! 01 May 2002: Current version of lusol7a.f.
   ! 13 Dec 2011: First f90 version.
+  ! 20 Jan 2016: Current version of lusol7a.f90.
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   subroutine lu7add( m, n, jadd, v, lena, luparm, parmlu, &
@@ -5309,8 +5459,8 @@ Colj:     do lc = lc1, lc2
                                     p(m)
     integer(ip),   intent(inout) :: luparm(30), lenL, lenU, lrow, &
                                     indr(lena), lenr(m), locr(m)
-    integer(ip),   intent(out)   :: inform, klast
     real(rp),      intent(inout) :: parmlu(30), a(lena), v(m)
+    integer(ip),   intent(out)   :: inform, klast
     real(rp),      intent(out)   :: vnorm
 
     !------------------------------------------------------------------
@@ -5323,11 +5473,11 @@ Colj:     do lc = lc1, lc2
     !
     ! 09 May 1988: First f77 version.
     ! 13 Dec 2011: First f90 version.
+    ! 20 Dec 2015: ilast is now output by lu1rec.
     !------------------------------------------------------------------
 
-    integer(ip)         :: i, j, k, leni, l, lr1, lr2, minfre, nfree
+    integer(ip)         :: i, ilast, j, k, leni, l, lr1, lr2, minfre, nfree
     real(rp)            :: small
-    real(rp), parameter :: zero = 0.0
 
     small  = parmlu(3)
     vnorm  = zero
@@ -5345,7 +5495,8 @@ Colj:     do lc = lc1, lc2
        minfre = leni + 1
        nfree  = lena - lenL - lrow
        if (nfree < minfre) then
-          call lu1rec( m, .true., luparm, lrow, lena, a, indr, lenr, locr )
+          call lu1rec( m, .true., luparm, lrow, ilast, &
+                       lena, a, indr, lenr, locr )
           nfree  = lena - lenL - lrow
           if (nfree < minfre) go to 970
        end if
@@ -5434,12 +5585,13 @@ Colj:     do lc = lc1, lc2
 
     integer(ip),   intent(in)    :: m, n, jelm, lena, nrank
     integer(ip),   intent(in)    :: lenU, q(n)   ! not used
+    real(rp),      intent(in)    :: v(m)
     integer(ip),   intent(inout) :: luparm(30), lenL, lrow,       &
                                     indc(lena), indr(lena), p(m), &
                                     lenr(m), locc(n), locr(m)
-    integer(ip),   intent(out)   :: inform
-    real(rp),      intent(in)    :: v(m)
     real(rp),      intent(inout) :: parmlu(30), a(lena)
+
+    integer(ip),   intent(out)   :: inform
     real(rp),      intent(out)   :: diag
 
     !------------------------------------------------------------------
@@ -5455,12 +5607,12 @@ Colj:     do lc = lc1, lc2
     ! 09 May 1988: First f77 version.
     !              No longer calls lu7for at end.  lu8rpc, lu8mod do so.
     ! 13 Dec 2011: First f90 version.
+    ! 20 Dec 2015: ilast is now output by lu1rec.
     !------------------------------------------------------------------
 
-    integer(ip)            :: i, imax, k, kmax, l, l1, l2, lmax, &
+    integer(ip)            :: i, ilast, imax, k, kmax, l, l1, l2, lmax, &
                               minfre, nfree, nrank1
     real(rp)               :: small, vi, vmax
-    real(rp),    parameter :: zero = 0.0
 
     small  = parmlu(3)
     nrank1 = nrank + 1
@@ -5471,7 +5623,8 @@ Colj:     do lc = lc1, lc2
     minfre = m - nrank
     nfree  = lena - lenL - lrow
     if (nfree < minfre) then
-       call lu1rec( m, .true., luparm, lrow, lena, a, indr, lenr, locr )
+       call lu1rec( m, .true., luparm, lrow, ilast, &
+                    lena, a, indr, lenr, locr )
        nfree  = lena - lenL - lrow
        if (nfree < minfre) go to 970
     end if
@@ -5561,8 +5714,9 @@ Colj:     do lc = lc1, lc2
     integer(ip),   intent(inout) :: luparm(30), lenL, lenU, lrow
     integer(ip),   intent(inout) :: indc(lena), indr(lena),     &
                                     p(m), lenr(m), locc(n), locr(m)
-    integer(ip),   intent(out)   :: inform
     real(rp),      intent(inout) :: parmlu(30), a(lena)
+
+    integer(ip),   intent(out)   :: inform
     real(rp),      intent(out)   :: diag
 
     !------------------------------------------------------------------
@@ -5598,16 +5752,16 @@ Colj:     do lc = lc1, lc2
     !    Jan 1985: Final f66 version.
     ! 09 May 1988: First f77 version.
     ! 13 Dec 2011: First f90 version.
+    ! 20 Dec 2015: ilast is now output by lu1rec.
     !------------------------------------------------------------------
 
     logical               :: swappd
-    integer(ip)           :: iv, iw, j, jfirst, jlast, jv,        &
+    integer(ip)           :: ilast, iv, iw, j, jfirst, jlast, jv, &
                              k, kbegin, kstart, kstop,            &
                              l, ldiag, lenv, lenw, lfirst, limit, &
                              lv, lv1, lv2, lv3, lw, lw1, lw2,     &
                              minfre, nfree
     real(rp)              :: amult, Ltol, Uspace, small, vj, wj
-    real(rp),   parameter :: zero = 0.0
 
 
     Ltol   = parmlu(2)
@@ -5632,7 +5786,8 @@ Colj:     do lc = lc1, lc2
     minfre = n + 1
     nfree  = lena - lenL - lrow
     if (nfree < minfre) then
-       call lu1rec( m, .true., luparm, lrow, lena, a, indr, lenr, locr )
+       call lu1rec( m, .true., luparm, lrow, ilast, &
+                    lena, a, indr, lenr, locr )
        lw1    = locr(iw)
        lw2    = lw1 + lenw - 1
        nfree  = lena - lenL - lrow
@@ -5663,8 +5818,8 @@ Colj:     do lc = lc1, lc2
        if (k == klast) go to 490
 
        !---------------------------------------------------------------
-       ! We are about to use the first element of row  iv
-       ! to eliminate the first element of row  iw.
+       ! We are about to use the first element of row iv
+       ! to eliminate the first element of row iw.
        ! However, we may wish to interchange the rows instead,
        ! to preserve stability and/or sparsity.
        !---------------------------------------------------------------
@@ -5681,7 +5836,7 @@ Colj:     do lc = lc1, lc2
        if (          lenv <= lenw   ) go to 200
 
        !---------------------------------------------------------------
-       ! Interchange rows  iv  and  iw.
+       ! Interchange rows iv and iw.
        !---------------------------------------------------------------
 150    p(klast) = iv
        p(k)     = iw
@@ -5690,7 +5845,7 @@ Colj:     do lc = lc1, lc2
        go to 600
 
        !---------------------------------------------------------------
-       ! Delete the eliminated element from row  iw
+       ! Delete the eliminated element from row iw
        ! by overwriting it with the last element.
        !---------------------------------------------------------------
 200    a(lfirst)    = a(lw2)
@@ -5705,7 +5860,7 @@ Colj:     do lc = lc1, lc2
        lw2          = lw2  - 1
 
        !---------------------------------------------------------------
-       ! Form the multiplier and store it in the  L  file.
+       ! Form the multiplier and store it in the L file.
        !---------------------------------------------------------------
        if (abs(wj) <= small) go to 490
        amult   = - wj/vj
@@ -5716,9 +5871,9 @@ Colj:     do lc = lc1, lc2
        lenL    = lenL + 1
 
        !---------------------------------------------------------------
-       ! Add the appropriate multiple of row  iv  to row  iw.
+       ! Add the appropriate multiple of row iv to row iw.
        ! We use two different inner loops.  The first one is for the
-       ! case where row  iw  is not at the end of storage.
+       ! case where row iw is not at the end of storage.
        !---------------------------------------------------------------
        if (lenv == 1) go to 490
        lv2    = lv1 + 1
@@ -5813,8 +5968,8 @@ Colj:     do lc = lc1, lc2
 
        lrow   = lw2
 
-       ! The  k-th  element of row  iw  has been processed.
-       ! Reset  swappd  before looking at the next element.
+       ! The k-th element of row iw has been processed.
+       ! Reset swappd before looking at the next element.
 
 490    swappd = .false.
     end do
@@ -5823,7 +5978,7 @@ Colj:     do lc = lc1, lc2
     ! End of main elimination loop.
     !==================================================================
 
-    ! Cancel markers on row  iw.
+    ! Cancel markers on row iw.
 
 600 lenr(iw) = lenw
     if (lenw == 0) go to 910
@@ -5866,7 +6021,8 @@ Colj:     do lc = lc1, lc2
 
 950 limit  = int(Uspace*real(lenU)) + m + n + 1000
     if (lrow > limit) then
-       call lu1rec( m, .true., luparm, lrow, lena, a, indr, lenr, locr )
+       call lu1rec( m, .true., luparm, lrow, ilast, &
+                    lena, a, indr, lenr, locr )
     end if
     go to 990
 
@@ -5892,9 +6048,10 @@ Colj:     do lc = lc1, lc2
     integer(ip),   intent(inout) :: lenL, lenU, lrow, nrank, &
                                     indc(lena), indr(lena), q(n),        &
                                     lenr(m), locc(n), locr(m)
-    integer(ip),   intent(out)   :: inform
     real(rp),      intent(inout) :: parmlu(30)  ! not used
-    real(rp),      intent(inout) :: diag, a(lena)
+    real(rp),      intent(inout) :: a(lena)
+    integer(ip),   intent(out)   :: inform
+    real(rp),      intent(out)   :: diag
 
     !------------------------------------------------------------------
     ! lu7rnk (check rank) assumes U is currently nrank by n
@@ -5918,7 +6075,6 @@ Colj:     do lc = lc1, lc2
 
     integer(ip)             :: iw, jmax, kmax, l, l1, l2, lenw, lmax
     real(rp)                :: Umax, Utol1
-    real(rp), parameter     :: zero = 0.0
 
     Utol1    = parmlu(4)
     diag     = zero
@@ -5982,7 +6138,6 @@ Colj:     do lc = lc1, lc2
     nrank  = nrank - 1
 
     if (lenw > 0) then       ! Delete row nrank from U.
-
        lenU     = lenU - lenw
        lenr(iw) = 0
        do l = l1, l2
@@ -5990,7 +6145,6 @@ Colj:     do lc = lc1, lc2
        end do
 
        if (l2 == lrow) then
-
           ! This row was at the end of the data structure.
           ! We have to reset lrow.
           ! Preceding rows might already have been deleted, so we
@@ -6024,8 +6178,8 @@ Colj:     do lc = lc1, lc2
                                     p(m)
     integer(ip),   intent(inout) :: lenU, lrow, &
                                     indr(lena), q(n), lenr(m), locr(m)
-    integer(ip),   intent(out)   :: kzap
     real(rp),      intent(inout) :: a(lena)
+    integer(ip),   intent(out)   :: kzap
 
     !------------------------------------------------------------------
     ! lu7zap  eliminates all nonzeros in column  jzap  of  U.
@@ -6077,10 +6231,10 @@ Colj:     do lc = lc1, lc2
        if (indr(lrow) == 0) lrow = lrow - 1
     end if
 
-  end subroutine lu7zap ! subroutine lu7zap
+  end subroutine lu7zap
 
   !*********************************************************************
-  ! Original file: lusol8a.f
+  ! File lusol8a.f90
   !
   ! lu8rpc
   !
@@ -6091,6 +6245,7 @@ Colj:     do lc = lc1, lc2
   ! 01 May 2002: Current version of lusol8a.f.
   ! 15 Sep 2004: Test nout. gt. 0 to protect write statements.
   ! 13 Dec 2011: First f90 version.
+  ! 20 Jan 2016: Current version of lusol8a.f90.
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   subroutine lu8rpc( mode1, mode2, m, n, jrep, v, w, &
@@ -6103,9 +6258,9 @@ Colj:     do lc = lc1, lc2
     integer(ip),   intent(inout) :: luparm(30), &
                                     indc(lena), indr(lena), p(m), q(n), &
                                     lenc(n), lenr(m), locc(n), locr(m)
-    integer(ip),   intent(out)   :: inform
     real(rp),      intent(inout) :: parmlu(30), a(lena), v(m), &
                                     w(n)  ! not used
+    integer(ip),   intent(out)   :: inform
     real(rp),      intent(out)   :: diag, vnorm
 
     !------------------------------------------------------------------
@@ -6156,7 +6311,6 @@ Colj:     do lc = lc1, lc2
                               l1, lenL, lenU, lprint, lrow, nout, nrank, nrank0
     real(rp)               :: Utol1, Utol2
     integer(ip), parameter :: i1 = 1
-    real(rp),    parameter :: zero = 0.0
 
     nout   = luparm(1)
     lprint = luparm(2)
@@ -6433,8 +6587,7 @@ Colj:     do lc = lc1, lc2
 
   function jdamax( n, x, incx )  result(iAmax)
 
-    integer(ip), intent(in)    :: n
-    integer,     intent(in)    :: incx   ! default integer size
+    integer(ip), intent(in)    :: n, incx
     real(rp),    intent(in)    :: x(:)
     integer(ip)                :: iAmax
 
@@ -6453,7 +6606,6 @@ Colj:     do lc = lc1, lc2
     integer(ip)         :: i, ix, kmax
     real(rp)            :: dmax, xi
     real(rp), parameter :: realmax = huge(realmax)
-    real(rp), parameter :: zero    = 0.0
 
     if (n < 1) then
        iAmax = 0
