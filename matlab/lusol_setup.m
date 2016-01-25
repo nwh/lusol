@@ -4,7 +4,7 @@ function lusol_setup(install)
 % Usage:
 %   >> cd [lusol directory]
 %   >> lusol_setup('install') % to create load_lusol file in userpath
-%   >> lusol_setup            % to add arcopt directly to path
+%   >> lusol_setup            % to add lusol directly to path
 %
 % After lusol_setup('install'), the following command will add arcopt to
 % Matlab's path:
