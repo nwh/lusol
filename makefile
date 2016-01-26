@@ -57,9 +57,13 @@ ifneq ($(DARWIN),)
 	EXPORT_SYMBOLS := src/symbols.osx
   LDFLAGS := -dynamiclib
 	LDFLAGS += -Wl,-twolevel_namespace
+  LDFLAGS += -Wl,-no_compact_unwind
   LDFLAGS += -undefined error
   LDFLAGS += -bind_at_load
-  LDFLAGS += -L/usr/local/Cellar/gcc/5.3.0/lib/gcc/5 -lgfortran
+  LDFLAGS += /usr/local/opt/gcc/lib/gcc/5/libgfortran.a
+  LDFLAGS += /usr/local/opt/gcc/lib/gcc/5/libquadmath.a
+  #LDFLAGS += -L/usr/local/Cellar/gcc/5.3.0/lib/gcc/5 -lgfortran
+  LDFLAGS += -L/usr/local/lib/gcc/5 -lgcc_s.1
   LDFLAGS += -L/Applications/MATLAB_R2015b.app/bin/maci64 -lmwblas
   #LDFLAGS += -L/Applications/MATLAB_R2015b.app/sys/os/maci64 -lgfortran
   #LDFLAGS += /usr/local/Cellar/gcc/5.3.0/lib/gcc/5/libgfortran.a # does not work

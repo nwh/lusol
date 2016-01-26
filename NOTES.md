@@ -28,3 +28,28 @@ Specific documents:
 ### How to write shared libraries by Drepper
 
 <https://www.akkadia.org/drepper/dsohowto.pdf>
+
+### Tracking down libraries used
+
+```
+$ otool -L libgfortran.dylib 
+libgfortran.dylib:
+	/usr/local/opt/gcc/lib/gcc/5/libgfortran.3.dylib (compatibility version 4.0.0, current version 4.0.0)
+	/usr/local/Cellar/gcc/5.3.0/lib/gcc/5/libquadmath.0.dylib (compatibility version 1.0.0, current version 1.0.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1225.1.1)
+	/usr/local/lib/gcc/5/libgcc_s.1.dylib (compatibility version 1.0.0, current
+    version 1.0.0)
+```
+
+```
+$ otool -L libquadmath.dylib 
+libquadmath.dylib:
+	/usr/local/opt/gcc/lib/gcc/5/libquadmath.0.dylib (compatibility version 1.0.0, current version 1.0.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1225.1.1)
+	/usr/local/lib/gcc/5/libgcc_s.1.dylib (compatibility version 1.0.0, current
+    version 1.0.0)
+```
+
+LDFLAGS += /usr/local/opt/gcc/lib/gcc/5/libgfortran.a
+LDFLAGS += /usr/local/opt/gcc/lib/gcc/5/libquadmath.a
+LDFLAGS += -L/usr/local/lib/gcc/5 -lgcc_s.1
