@@ -62,11 +62,12 @@ ifneq ($(DARWIN),)
   LDFLAGS += -bind_at_load
   LDFLAGS += /usr/local/opt/gcc/lib/gcc/5/libgfortran.a
   LDFLAGS += /usr/local/opt/gcc/lib/gcc/5/libquadmath.a
-  #LDFLAGS += -L/usr/local/Cellar/gcc/5.3.0/lib/gcc/5 -lgfortran
-  LDFLAGS += -L/usr/local/lib/gcc/5 -lgcc_s.1
+  LDFLAGS += /usr/local/Cellar/gcc/5.3.0/lib/gcc/5/gcc/x86_64-apple-darwin15.0.0/5.3.0/libgcc.a
   LDFLAGS += -L/Applications/MATLAB_R2015b.app/bin/maci64 -lmwblas
+  # I tested the following flags for dynamic linking, all resulted in problems
+  #LDFLAGS += -L/usr/local/Cellar/gcc/5.3.0/lib/gcc/5 -lgfortran
   #LDFLAGS += -L/Applications/MATLAB_R2015b.app/sys/os/maci64 -lgfortran
-  #LDFLAGS += /usr/local/Cellar/gcc/5.3.0/lib/gcc/5/libgfortran.a # does not work
+  #LDFLAGS += -L/usr/local/lib/gcc/5 -lgcc_s.1
 	LDFLAGS += -Wl,-exported_symbols_list,$(EXPORT_SYMBOLS)
 else
   # settins for linux
