@@ -13,5 +13,4 @@ This directory contains LUSOL fortran 77 and fortran 90 code.
 * `lusol_precision.f90`: fortran 90 module to specify precision
 * `lusol.txt`: some LUSOL documentation and history
 * `lusol_util.f`: fortran 77 code for factorization, solve, and replace column
-* `updates/`: (2016-01-23) a directory containing updates to LUSOL, will be
-  factored in to the Matlab interface when time permits.
+* `symbols.osx`: list of symbols to export in osx dynamic library

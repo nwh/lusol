@@ -64,10 +64,10 @@ See `>>> help lusol_obj`.
 
 ### Environment
 
-The build environments as of 2014-05-18 are:
+The build environments as of 2016-01-26 are:
 
 - Fedora 21 & Matlab 2013b
-- Mac OS X 10.9 & Matlab 2014a
+- Mac OS X 10.11 & Matlab 2015b
 
 Building the LUSOL interface in other environments may require modification of
 `makefile` and `matlab/lusol_build.m`.
@@ -84,7 +84,7 @@ Linux:
 Mac:
 
 * [Xcode][XC] for `clang` and `make`
-* `gfortran-4.3` (possibly via [Homebrew][HB])
+* `gfortran` (possibly via [Homebrew][HB])
 * Matlab
 
   [HB]: http://brew.sh/
@@ -98,7 +98,7 @@ Notes:
 * It is necessary to launch Xcode and accept the license agreement before
   building the interface.
 * The smaller Xcode Command Line Tools package does not appear to work with
-  Matlab 2014a.  The full Xcode install is required.
+  Matlab 2015b.  The full Xcode install is required.
 
 ### Setup `mex`
 
@@ -107,15 +107,16 @@ compiler.  This can be achieved by executing `mex -setup` from the Matlab prompt
 or operating system terminal.  On Linux the selected compiler must be the
 correct version of `gcc`.  On Mac OS X 10.9 the selected compiler must be
 `clang`.  It is a good idea to match the compiler suggested on the Mathworks
-[supported compilers][MC] page.
+[supported compilers][MC] page.  See this [note][MEX-XCODE-7] on Matlab
+compatibility with Xcode 7.
 
   [MC]: http://www.mathworks.com/support/compilers/
+  [MEX-XCODE-7]: http://www.mathworks.com/matlabcentral/answers/246507-why-can-t-mex-find-a-supported-compiler-in-matlab-r2015b-after-i-upgraded-to-xcode-7-0#answer_194526
 
-### Install `gfortran-4.3` on Mac OS X
+### Install `gfortran` on Mac OS X
 
 1. Install [Homebrew][HB]
-2. `$ brew tap homebrew/versions`
-3. `$ brew install gcc43 --enable-fortran`
+3. `$ brew install gcc`
 
 ### Steps
 
@@ -123,77 +124,16 @@ From the base directory:
 
 ```
 $ make
+$ make matlab
 ```
 
-Mac OS X output from 2014-05-18:
-
-```
-$ make
-clang  -fPIC -c src/clusol.c -o src/clusol.o
-gfortran-4.3 -fPIC -Jsrc -O3 -c src/lusol_precision.f90 -o src/lusol_precision.o
-gfortran-4.3 -fPIC -Jsrc -O3 -c src/lusol.f90 -o src/lusol.o
-gfortran-4.3 -fPIC -fdefault-integer-8 -O3 -c src/lusol_util.f -o src/lusol_util.o
-gfortran-4.3 -fPIC -fdefault-integer-8 -O3 -c src/lusol6b.f -o src/lusol6b.o
-gfortran-4.3 -fPIC -fdefault-integer-8 -O3 -c src/lusol7b.f -o src/lusol7b.o
-gfortran-4.3 -fPIC -fdefault-integer-8 -O3 -c src/lusol8b.f -o src/lusol8b.o
-clang src/clusol.o src/lusol.o src/lusol_precision.o src/lusol_util.o src/lusol6b.o src/lusol7b.o src/lusol8b.o -o src/libclusol.dylib -dynamiclib -L/Applications/MATLAB_R2014a.app/bin/maci64 -lmwblas -L/Applications/MATLAB_R2014a.app/sys/os/maci64 -lgfortran
-mkdir -p lib
-cp src/libclusol.dylib lib/libclusol.dylib
-mkdir -p include
-cp src/clusol.h include/clusol.h
-cp src/libclusol.dylib src/clusol.h ./matlab/
-matlab -nojvm -nodisplay -r "cd matlab; lusol_build; exit"
-
-                            < M A T L A B (R) >
-                  Copyright 1984-2014 The MathWorks, Inc.
-                     R2014a (8.3.0.532) 64-bit (maci64)
-                             February 11, 2014
-
-
-To get started, type one of these: helpwin, helpdesk, or demo.
-For product information, visit www.mathworks.com.
-```
-
-Note: As of 2014-10-29, the `lusol_build` script emits a warning message.  This
-may have something to do with updated header files in the Xcode package.  The
-tests still pass.
-
-### Test
-
-From the base directory:
+Test:
 
 ```
 $ make matlab_test
 ```
 
-Mac OS X output from 2014-05-18:
-
-```
-$ make matlab_test
-matlab -nojvm -nodisplay -r "cd matlab; lusol_test; exit"
-
-                            < M A T L A B (R) >
-                  Copyright 1984-2014 The MathWorks, Inc.
-                     R2014a (8.3.0.532) 64-bit (maci64)
-                             February 11, 2014
-
-
-To get started, type one of these: helpwin, helpdesk, or demo.
-For product information, visit www.mathworks.com.
-
-test_addcol_lhr02: passed
-test_addrow_lhr02: passed
-test_delcol_lhr02: passed
-test_delrow_lhr02: passed
-test_factorize_lhr02: passed
-test_mulA_lhr02: passed
-test_mulAt_lhr02: passed
-test_r1mod_lhr02: passed
-test_repcol_lhr02: passed
-test_reprow_lhr02: passed
-test_solveA_lhr02: passed
-test_solveAt_lhr02: passed
-```
+See <NOTES.md> for example build output.
 
 ### Notes
 
@@ -203,17 +143,14 @@ may be necessary to modify the compiler variables in the `makefile` (`CC`,
 `F90C`, and `F77C`) depending on the operating system and environment.
 
 The `matlab` executable must be on the system path.  On Mac OS X with Matlab
-R2014a this is achieved with:
+R2015b this is achieved with:
 
 ```
-$ export PATH=/Applications/MATLAB_R2014a.app/bin:$PATH
+$ export PATH=/Applications/MATLAB_R2015b.app/bin:$PATH
 ```
 
 The `makefile` may have to be modified on Mac OS X depending on versions of
-Matlab and `gfortran`.  The [`LDFLAGS`][LDFLAGS] need to point to the proper
-directories for Matlab `blas` and `gfortran` shared libraries.
-
-  [LDFLAGS]: https://github.com/nwh/lusol/blob/master/makefile#L58
+Matlab and `gfortran`.
 
 ## Authors
 
