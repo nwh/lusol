@@ -44,19 +44,20 @@
 ! 20 Dec 2015: lu1rec returns ilast as output parameter.
 ! 21 Dec 2015: lu1DCP exits if aijmax <= small.
 ! 20 Jan 2016: sn28lusol.f90 updated to match sn27lu.f of 21 Dec 2015.
-! 25 Jan 2016: File renamed to lusol.f90 for inclusion into Matlab interface.
-!              Module renamed to lusol for inclusion into Matlab interface.
+! 25 Jan 2016: Module snConstants replaced by local zero, one, i1.
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 module lusol
-  use  lusol_precision
-  use  lusol_constants
+  use  lusol_precision,        only : ip, rp
 
   implicit none
   private
   public    :: lu1fac, lu6sol, lu8rpc
   private   :: jdamax
   intrinsic :: abs, int, max, min, real
+
+  integer(ip),  parameter :: i1     = 1
+  real(rp),     parameter :: zero   = 0.0, one   = 1.0
 
 contains
 
@@ -4200,7 +4201,7 @@ Colj:     do lc = lc1, lc2
           ! Do row elimination with column indexing.
           !===========================================================
           t = - one / a(k,k)
-          ! call dscal ( m-k, t, a(kp1,k), 1 )
+          ! call dscal ( m-k, t, a(kp1,k), i1 )
           a(kp1:m,k) = t*a(kp1:m,k)
 
           do j = kp1, last
@@ -4209,7 +4210,7 @@ Colj:     do lc = lc1, lc2
                 a(l,j) = a(k,j)
                 a(k,j) = t
              end if
-             ! call daxpy ( m-k, t, a(kp1,k), 1, a(kp1,j), 1 )
+             ! call daxpy ( m-k, t, a(kp1,k), i1, a(kp1,j), i1 )
              a(kp1:m,j) = t*a(kp1:m,k) + a(kp1:m,j)
           end do
 
@@ -4388,7 +4389,7 @@ Colj:     do lc = lc1, lc2
           ! Do row elimination with column indexing.
           !===========================================================
           t      = - one / t
-          ! call dscal ( m-k, t, a(kp1,k), 1 )
+          ! call dscal ( m-k, t, a(kp1,k), i1 )
           a(kp1:m,k) = t*a(kp1:m,k)
 
           do j = kp1, last
@@ -4397,7 +4398,7 @@ Colj:     do lc = lc1, lc2
                 a(imax,j) = a(k,j)
                 a(k,j)    = t
              end if
-             ! call daxpy ( m-k, t, a(kp1,k), 1, a(kp1,j), 1 )
+             ! call daxpy ( m-k, t, a(kp1,k), i1, a(kp1,j), i1 )
              a(kp1:m,j) = t*a(kp1:m,k) + a(kp1:m,j)
           end do
 
@@ -6365,7 +6366,7 @@ Colj:     do lc = lc1, lc2
        call lu7add( m, n, jrep, v,           &
                     lena, luparm, parmlu,    &
                     lenL, lenU, lrow, nrank, &
-                    a, indr, p, lenr, locr, &
+                    a, indr, p, lenr, locr,  &
                     inform, klast, vnorm )
        if (inform == 7) go to 970
     end if

@@ -60,15 +60,17 @@ ifneq ($(DARWIN),)
   LDFLAGS += -Wl,-no_compact_unwind
   LDFLAGS += -undefined error
   LDFLAGS += -bind_at_load
+	LDFLAGS += -Wl,-exported_symbols_list,$(EXPORT_SYMBOLS)
+  # static libraries
   LDFLAGS += /usr/local/opt/gcc/lib/gcc/5/libgfortran.a
   LDFLAGS += /usr/local/opt/gcc/lib/gcc/5/libquadmath.a
   LDFLAGS += /usr/local/Cellar/gcc/5.3.0/lib/gcc/5/gcc/x86_64-apple-darwin15.0.0/5.3.0/libgcc.a
+  # get blas from Matlab
   LDFLAGS += -L/Applications/MATLAB_R2015b.app/bin/maci64 -lmwblas
   # I tested the following flags for dynamic linking, all resulted in problems
   #LDFLAGS += -L/usr/local/Cellar/gcc/5.3.0/lib/gcc/5 -lgfortran
   #LDFLAGS += -L/Applications/MATLAB_R2015b.app/sys/os/maci64 -lgfortran
   #LDFLAGS += -L/usr/local/lib/gcc/5 -lgcc_s.1
-	LDFLAGS += -Wl,-exported_symbols_list,$(EXPORT_SYMBOLS)
 else
   # settins for linux
   LD := gcc
@@ -110,7 +112,6 @@ F77_OBJ := $(patsubst %.f,%.o,$(filter %.f,$(F77_FILES)))
 # list of F90 code files
 F90_FILES := \
   src/lusol_precision.f90 \
-  src/lusol_constants.f90 \
   src/lusol.f90
 
 F90_OBJ := $(patsubst %.f90,%.o,$(filter %.f90,$(F90_FILES)))
@@ -140,7 +141,7 @@ $(F90_OBJ) : %.o : %.f90
 $(F90_MOD) : %.mod : %.o
 
 # extra fortran dependencies
-lusol.o : lusol_precision.mod lusol_constants.mod
+lusol.o : lusol_precision.mod
 
 # C code generation
 src/clusol.h: $(INTERFACE_FILES)
@@ -155,7 +156,7 @@ src/clusol.o: src/clusol.c src/clusol.h
 
 # Link the dynamic library
 src/libclusol.$(LIB_SUFFIX): $(OBJ) $(EXPORT_SYMBOLS)
-	$(LD) $(OBJ) -o $@ $(LDFLAGS)
+	$(LD) $(LDFLAGS) $(OBJ) -o $@
 
 # file copying to matlab directory
 $(MATLAB_FILES): src/libclusol.$(LIB_SUFFIX) src/clusol.h
