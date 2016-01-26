@@ -54,9 +54,12 @@ ifneq ($(DARWIN),)
   # settings for mac os x
   LD := clang
   LIB_SUFFIX := dylib
+	EXPORT_SYMBOLS := src/symbols.osx
   LDFLAGS := -dynamiclib
   LDFLAGS += -L/Applications/MATLAB_R2015b.app/bin/maci64 -lmwblas
-  LDFLAGS += -L/Applications/MATLAB_R2015b.app/sys/os/maci64 -lgfortran
+  #LDFLAGS += -L/Applications/MATLAB_R2015b.app/sys/os/maci64 -lgfortran
+	LDFLAGS += -L/usr/local/Cellar/gcc/5.3.0/lib/gcc/5 -lgfortran
+	LDFLAGS += -Wl,-exported_symbols_list,$(EXPORT_SYMBOLS)
 else
   # settins for linux
   LD := gcc
@@ -95,47 +98,57 @@ F77_FILES := \
 
 F77_OBJ := $(patsubst %.f,%.o,$(filter %.f,$(F77_FILES)))
 
+# list of F90 code files
+F90_FILES := \
+  src/lusol_precision.f90 \
+  src/lusol_constants.f90 \
+  src/lusol.f90
+
+F90_OBJ := $(patsubst %.f90,%.o,$(filter %.f90,$(F90_FILES)))
+F90_MOD := $(patsubst %.f90,%.mod,$(filter %.f90,$(F90_FILES)))
+
+# list of object files
+OBJ := src/clusol.o
+OBJ += $(F90_OBJ)
+OBJ += $(F77_OBJ)
+
 # set the default goal
 .DEFAULT_GOAL := all
 
 # default target to build everything
 .PHONY: all
-all: lib/libclusol.$(LIB_SUFFIX) include/clusol.h matlab
+all: src/libclusol.$(LIB_SUFFIX) src/clusol.h
 
 # pattern to compile fortran 77 files
 $(F77_OBJ) : %.o : %.f
 	$(F77C) $(F77FLAGS) -c $< -o $@
 
-src/lusol_precision.o: src/lusol_precision.f90
+# pattern to compile fortran 90 files
+$(F90_OBJ) : %.o : %.f90
 	$(F90C) $(F90FLAGS) -c $< -o $@
 
-src/lusol_precision.mod: src/lusol_precision.o
+# dependencies for F90 module files
+$(F90_MOD) : %.mod : %.o
 
-src/lusol.o: src/lusol.f90 src/lusol_precision.mod
-	$(F90C) $(F90FLAGS) -c $< -o $@
+# extra fortran dependencies
+lusol.o : lusol_precision.mod lusol_constants.mod
 
-src/lusol.mod: src/lusol.o
-
+# C code generation
 src/clusol.h: $(INTERFACE_FILES)
 	./gen/interface.py -i gen/interface_files.org -o $@ -t header
 
 src/clusol.c: $(INTERFACE_FILES)
 	./gen/interface.py -i gen/interface_files.org -o $@ -t source
 
+# C compilation
 src/clusol.o: src/clusol.c src/clusol.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-src/libclusol.$(LIB_SUFFIX): src/clusol.o src/lusol.o src/lusol_precision.o $(F77_OBJ)
-	$(LD) $^ -o $@ $(LDFLAGS)
+# Link the dynamic library
+src/libclusol.$(LIB_SUFFIX): $(OBJ) $(EXPORT_SYMBOLS)
+	$(LD) $(OBJ) -o $@ $(LDFLAGS)
 
-include/clusol.h: src/clusol.h
-	mkdir -p include
-	cp $< $@
-
-lib/libclusol.$(LIB_SUFFIX): src/libclusol.$(LIB_SUFFIX)
-	mkdir -p lib
-	cp $< $@
-
+# file copying to matlab directory
 $(MATLAB_FILES): src/libclusol.$(LIB_SUFFIX) src/clusol.h
 	cp src/libclusol.$(LIB_SUFFIX) src/clusol.h ./matlab/
 	$(ML) $(MLFLAGS) -r "cd matlab; lusol_build; exit"
@@ -152,9 +165,6 @@ clean:
 	$(RM) src/*.o
 	$(RM) src/*.$(LIB_SUFFIX)
 	$(RM) src/*.mod
-	$(RM) lib/libclusol.so
-	$(RM) lib/libclusol.$(LIB_SUFFIX)
-	$(RM) include/clusol.h
 	$(RM) $(MATLAB_FILES)
 
 .PHONY: clean_gen

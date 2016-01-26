@@ -50,7 +50,7 @@
 
 module lusol
   use  lusol_precision
-! use  snConstants
+  use  lusol_constants
 
   implicit none
   private
@@ -4156,7 +4156,7 @@ Colj:     do lc = lc1, lc2
 
     ! Find l, the pivot row.
 
-    l       = jdamax( lencol, a(k:m,k), 1 ) + k - 1
+    l       = jdamax( lencol, a(k:m,k), i1 ) + k - 1
     ipvt(k) = l
 
     if (abs( a(l,k) ) <= small) then
@@ -4317,7 +4317,7 @@ Colj:     do lc = lc1, lc2
        jlast  = last
 
        do j = k, jlast
-10        l      = jdamax( lencol, a(k:m,j), 1 ) + k - 1
+10        l      = jdamax( lencol, a(k:m,j), i1 ) + k - 1
           ajmax  = abs(a(l,j))
 
           if (ajmax <= small) then

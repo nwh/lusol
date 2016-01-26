@@ -1,7 +1,12 @@
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! File lusol_precision.f90
+! File lusol_recision.f90
 !
-! LUSOL module for defining integer(ip), real(rp).
+! SNOPT module for defining integer(ip), real(rp).
+! snPrecision.f90 should be one of the following 3 files:
+!
+! snPrecision32.f90   sets  ip=4, rp = 8
+! snPrecision64.f90   sets  ip=8, rp = 8
+! snPrecision128.f90  sets  ip=8, rp = 16
 !
 ! ip  huge
 !  4  2147483647
@@ -29,15 +34,13 @@
 ! 20 Apr 2012: First quad version.
 ! 22 Apr 2012: Made three versions of snPrecision.f90.
 !              See README.QUAD for use with configure and make.
-! 17 Jul 2013: Changed name to lusol_precision.f90
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 module lusol_precision
-
+  use  iso_fortran_env
   implicit none
-  private
-  public                :: ip, rp
+  public
 
-  integer(4), parameter :: ip = 8, rp = 8
+  integer(4),   parameter :: ip = int64, rp = real64
 
 end module lusol_precision
