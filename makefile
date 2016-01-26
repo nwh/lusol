@@ -56,9 +56,10 @@ ifneq ($(DARWIN),)
   LIB_SUFFIX := dylib
 	EXPORT_SYMBOLS := src/symbols.osx
   LDFLAGS := -dynamiclib
+  LDFLAGS += -L/usr/local/Cellar/gcc/5.3.0/lib/gcc/5 -lgfortran
   LDFLAGS += -L/Applications/MATLAB_R2015b.app/bin/maci64 -lmwblas
   #LDFLAGS += -L/Applications/MATLAB_R2015b.app/sys/os/maci64 -lgfortran
-	LDFLAGS += -L/usr/local/Cellar/gcc/5.3.0/lib/gcc/5 -lgfortran
+  #LDFLAGS += /usr/local/Cellar/gcc/5.3.0/lib/gcc/5/libgfortran.a # does not work
 	LDFLAGS += -Wl,-exported_symbols_list,$(EXPORT_SYMBOLS)
 else
   # settins for linux
