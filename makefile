@@ -10,12 +10,12 @@ ifneq ($(DARWIN),)
   # C compiler for osx
   CC := clang
   CPPFLAGS :=
-  CFLAGS := -fPIC
+  CFLAGS := -arch x86_64 -fPIC
 else
   # C compiler for linux
   CC := gcc
   CPPFLAGS :=
-  CFLAGS := -fPIC
+  CFLAGS := -m64 -fPIC
 endif
 
 # Fortran optimization level
@@ -25,17 +25,17 @@ FOPT := -O3
 ifneq ($(DARWIN),)
   # Fortran 90 compiler
   F90C := gfortran
-  F90FLAGS := -fPIC -Jsrc $(FOPT)
+  F90FLAGS := -m64 -fPIC -Jsrc $(FOPT)
   # Fortran 77 compiler
   F77C := gfortran
-  F77FLAGS := -fPIC -fdefault-integer-8 $(FOPT)
+  F77FLAGS := -m64 -fPIC -fdefault-integer-8 $(FOPT)
 else
   # Fortran 90 compiler
   F90C := gfortran
-  F90FLAGS :=  -fPIC -Jsrc $(FOPT)
+  F90FLAGS :=  -m64 -fPIC -Jsrc $(FOPT)
   # Fortran 77 compiler
   F77C := gfortran
-  F77FLAGS := -fPIC -fdefault-integer-8 $(FOPT)
+  F77FLAGS := -m64 -fPIC -fdefault-integer-8 $(FOPT)
 endif
 
 # Matlab
@@ -56,7 +56,8 @@ ifneq ($(DARWIN),)
   LIB_SUFFIX := dylib
 	EXPORT_SYMBOLS := src/symbols.osx
   LDFLAGS := -dynamiclib
-	LDFLAGS += -Wl,-twolevel_namespace
+  LDFLAGS += -arch x86_64
+  LDFLAGS += -Wl,-twolevel_namespace
   LDFLAGS += -Wl,-no_compact_unwind
   LDFLAGS += -undefined error
   LDFLAGS += -bind_at_load
