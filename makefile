@@ -54,14 +54,14 @@ ifneq ($(DARWIN),)
   # settings for mac os x
   LD := clang
   LIB_SUFFIX := dylib
-	EXPORT_SYMBOLS := src/symbols.osx
+  EXPORT_SYMBOLS := src/symbols.osx
   LDFLAGS := -dynamiclib
   LDFLAGS += -arch x86_64
   LDFLAGS += -Wl,-twolevel_namespace
   LDFLAGS += -Wl,-no_compact_unwind
   LDFLAGS += -undefined error
   LDFLAGS += -bind_at_load
-	LDFLAGS += -Wl,-exported_symbols_list,$(EXPORT_SYMBOLS)
+  LDFLAGS += -Wl,-exported_symbols_list,$(EXPORT_SYMBOLS)
   LDLIBS :=
   # static libraries
   LDLIBS += /usr/local/opt/gcc/lib/gcc/5/libgfortran.a
