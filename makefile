@@ -62,21 +62,23 @@ ifneq ($(DARWIN),)
   LDFLAGS += -undefined error
   LDFLAGS += -bind_at_load
 	LDFLAGS += -Wl,-exported_symbols_list,$(EXPORT_SYMBOLS)
+  LDLIBS :=
   # static libraries
-  LDFLAGS += /usr/local/opt/gcc/lib/gcc/5/libgfortran.a
-  LDFLAGS += /usr/local/opt/gcc/lib/gcc/5/libquadmath.a
-  LDFLAGS += /usr/local/Cellar/gcc/5.3.0/lib/gcc/5/gcc/x86_64-apple-darwin15.0.0/5.3.0/libgcc.a
+  LDLIBS += /usr/local/opt/gcc/lib/gcc/5/libgfortran.a
+  LDLIBS += /usr/local/opt/gcc/lib/gcc/5/libquadmath.a
+  LDLIBS += /usr/local/Cellar/gcc/5.3.0/lib/gcc/5/gcc/x86_64-apple-darwin15.0.0/5.3.0/libgcc.a
   # get blas from Matlab
-  LDFLAGS += -L/Applications/MATLAB_R2015b.app/bin/maci64 -lmwblas
-  # I tested the following flags for dynamic linking, all resulted in problems
-  #LDFLAGS += -L/usr/local/Cellar/gcc/5.3.0/lib/gcc/5 -lgfortran
-  #LDFLAGS += -L/Applications/MATLAB_R2015b.app/sys/os/maci64 -lgfortran
-  #LDFLAGS += -L/usr/local/lib/gcc/5 -lgcc_s.1
+  LDLIBS += -L/Applications/MATLAB_R2015b.app/bin/maci64 -lmwblas
 else
   # settins for linux
   LD := gcc
   LIB_SUFFIX := so
-  LDFLAGS := -shared -lgfortran
+  EXPORT_SYMBOLS := src/symbols.map
+  LDFLAGS := -m64 -shared
+  LDFLAGS += -Wl,--version-script,$(EXPORT_SYMBOLS)
+  # libraries
+  LDLIBS :=
+  LDLIBS += -Wl,-rpath,/usr/lib -lgfortran
 endif
 
 # list of files required by matlab
@@ -157,7 +159,7 @@ src/clusol.o: src/clusol.c src/clusol.h
 
 # Link the dynamic library
 src/libclusol.$(LIB_SUFFIX): $(OBJ) $(EXPORT_SYMBOLS)
-	$(LD) $(LDFLAGS) $(OBJ) -o $@
+	$(LD) $(LDFLAGS) $(OBJ) -o $@ $(LDLIBS)
 
 # file copying to matlab directory
 $(MATLAB_FILES): src/libclusol.$(LIB_SUFFIX) src/clusol.h
