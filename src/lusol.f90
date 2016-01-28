@@ -45,6 +45,9 @@
 ! 21 Dec 2015: lu1DCP exits if aijmax <= small.
 ! 20 Jan 2016: sn28lusol.f90 updated to match sn27lu.f of 21 Dec 2015.
 ! 25 Jan 2016: Module snConstants replaced by local zero, one, i1.
+! 27 Jan 2016: i2 is another local constant.
+!              NOTE: Local function jdamax is like a BLAS routine,
+!              but no BLAS routines are used in this f90 version of LUSOL.
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 module lusol
@@ -56,8 +59,8 @@ module lusol
   private   :: jdamax
   intrinsic :: abs, int, max, min, real
 
-  integer(ip),  parameter :: i1     = 1
-  real(rp),     parameter :: zero   = 0.0, one   = 1.0
+  integer(ip),  parameter :: i1   = 1,   i2  = 2
+  real(rp),     parameter :: zero = 0.0, one = 1.0
 
 contains
 
@@ -447,8 +450,6 @@ contains
                               dm, dn, DUmax, DUmin, growth,            &
                               Lmax, Ltol, small, Ugrwth,               &
                               Umax
-    integer(ip), parameter :: i1 = 1
-
 
     ! Grab relevant input parameters.
 
@@ -981,8 +982,6 @@ contains
     real(rp)               :: abest, aijmax, aijtol, amax, &
                               dens1, dens2, diag,          &
                               Lij, Ltol, small, Uspace
-    integer(ip), parameter :: i1 = 1
-
 
     !------------------------------------------------------------------
     ! Local variables
@@ -4768,8 +4767,6 @@ Colj:     do lc = lc1, lc2
     ! 13 Dec 2011: First f90 version.
     !--------------------------------------------------------------------
 
-    integer(ip), parameter :: i1 = 1, i2 = 2
-
     if      (mode == 1) then             ! Solve  L v(new) = v.
        call lu6L  ( inform, m, n, v,    &
                     lena, luparm, parmlu, a, indc, indr, lenc )
@@ -6311,7 +6308,6 @@ Colj:     do lc = lc1, lc2
     integer(ip)            :: iw, j1, jsing, klast, krep, &
                               l1, lenL, lenU, lprint, lrow, nout, nrank, nrank0
     real(rp)               :: Utol1, Utol2
-    integer(ip), parameter :: i1 = 1
 
     nout   = luparm(1)
     lprint = luparm(2)
