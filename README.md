@@ -4,10 +4,9 @@
 
 This repository provides [LUSOL][LUSOL] source code and a Matlab interface.
 
-The code is distributed under the terms of the [Common Public License][CPL].
+The code is distributed under the terms of the MIT License or the BSD License.
 
   [LUSOL]: http://web.stanford.edu/group/SOL/software/lusol/
-  [CPL]: http://www.ibm.com/developerworks/library/os-cpl.html
 
 ## Contents
 
