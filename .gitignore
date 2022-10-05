@@ -8,3 +8,4 @@ matlab/clusol.h
 include/clusol.h
 matlab/libclusol_proto*.m
 *.DS_Store
+.MATLABDriveTag
