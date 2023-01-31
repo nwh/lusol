@@ -96,6 +96,7 @@
      $                   inform, diag )
 
       implicit           double precision (a-h,o-z)
+      integer            ilast
       integer            luparm(30)
       double precision   parmlu(30), a(lena), w(n)
       integer            indc(lena), indr(lena), ip(m), iq(n)
@@ -139,7 +140,8 @@
       minfre = n
       nfree  = lena - lenl - lrow
       if (nfree .ge. minfre) go to 100
-      call lu1rec( m, .true., luparm, lrow, lena, a, indr, lenr, locr )
+      call lu1rec( m, .true., luparm, lrow, ilast, lena,
+     &             a, indr, lenr, locr )
       nfree  = lena - lenl - lrow
       if (nfree .lt. minfre) go to 970
 
@@ -522,6 +524,7 @@
      $                   inform )
 
       implicit           double precision (a-h,o-z)
+      integer            ilast
       integer            luparm(30)
       double precision   parmlu(30), a(lena), v(m), w(n)
       integer            indc(lena), indr(lena), ip(m), iq(n)
@@ -640,7 +643,8 @@
       minfre = n + 1 - kfirst
       nfree  = lfree - lrow
       if (nfree .ge. minfre) go to 310
-      call lu1rec( m, .true., luparm, lrow, lena, a, indr, lenr, locr )
+      call lu1rec( m, .true., luparm, lrow, ilast, lena,
+     &             a, indr, lenr, locr )
       nfree  = lfree - lrow
       if (nfree .lt. minfre) go to 970
 
@@ -678,7 +682,8 @@
          minfre = n
          nfree  = lfree - lrow
          if (nfree .ge. minfre) go to 420
-         call lu1rec( m, .true., luparm, lrow, lena, a,indr,lenr,locr )
+         call lu1rec( m, .true., luparm, lrow, ilast, lena,
+     &                a, indr, lenr, locr )
          nfree  = lfree - lrow
          if (nfree .lt. minfre) go to 970
 
@@ -700,7 +705,8 @@
          minfre = n
          nfree  = lfree - lrow
          if (nfree .ge. minfre) go to 500
-         call lu1rec( m, .true., luparm, lrow, lena, a,indr,lenr,locr )
+         call lu1rec( m, .true., luparm, lrow, ilast, lena,
+     &                a, indr, lenr, locr )
          nfree  = lfree - lrow
          if (nfree .lt. minfre) go to 970
 
