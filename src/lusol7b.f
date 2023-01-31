@@ -149,6 +149,7 @@
      $                   inform )
 
       implicit           double precision (a-h,o-z)
+      integer            ilast
       integer            luparm(30)
       double precision   parmlu(30), a(lena), c(m)
       integer            indc(lena), indr(lena), ip(m), iq(n), lenr(m)
@@ -214,7 +215,8 @@
          minfre = n + 1
          nfree  = lfree - lrow
          if (nfree .ge. minfre) go to 200
-         call lu1rec( m, .true., luparm, lrow, lena, a,indr,lenr,locr )
+         call lu1rec( m, .true., luparm, lrow, ilast, lena,
+     &                a, indr, lenr, locr )
          cmprss = .true.
          nfree  = lfree - lrow
          if (nfree .lt. minfre) go to 970
