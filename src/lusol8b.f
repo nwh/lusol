@@ -557,6 +557,8 @@
 
       logical            singlr
 
+      parameter        ( zero = 0.0d+0 )
+
       nout   = luparm(1)
       lprint = luparm(2)
       nrank  = luparm(16)
