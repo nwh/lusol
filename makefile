@@ -144,7 +144,7 @@ $(F90_OBJ) : %.o : %.f90
 $(F90_MOD) : %.mod : %.o
 
 # extra fortran dependencies
-lusol.o : lusol_precision.mod
+src/lusol.o : src/lusol_precision.mod
 
 # C code generation
 src/clusol.h: $(INTERFACE_FILES)
